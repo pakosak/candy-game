@@ -1,37 +1,35 @@
+use anyhow::Result;
 use clap::Parser;
 use std::io::{stdin, stdout, Write};
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use std::time::Instant;
-use std::{
-    sync::{Arc, Mutex},
-    thread::{self, sleep},
-    time::Duration,
-};
 use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
+use tokio::sync::Mutex;
+use tokio::time::{sleep, Duration};
 
 mod map;
 mod world;
 use map::Direction;
 use world::World;
 
-fn read_player_movement(world: Arc<Mutex<World>>) {
-    let stdin = stdin();
-    let stdin = stdin.lock();
-    let mut keys = stdin.keys();
+async fn read_player_movement(world: Arc<Mutex<World>>) -> Result<()> {
+    let mut keys = stdin().keys();
     let mut prev_press = Instant::now();
 
-    while world.lock().unwrap().win_status().is_none() {
-        let key = keys.next().unwrap().unwrap();
+    while world.lock().await.win_status().is_none() {
+        let key = keys.next().ok_or(anyhow::anyhow!("No key pressed"))?;
 
         if prev_press.elapsed() < Duration::from_millis(100) {
             continue;
         }
-        let mut world = world.lock().unwrap();
+        let mut world = world.lock().await;
 
-        match key {
+        match key? {
             Key::Esc => {
-                return;
+                return Ok(());
             }
             Key::Left => world.move_player(Direction::Left),
             Key::Right => world.move_player(Direction::Right),
@@ -42,29 +40,29 @@ fn read_player_movement(world: Arc<Mutex<World>>) {
         };
         prev_press = Instant::now();
     }
+    Ok(())
 }
 
-fn move_mobs_loop(world: Arc<Mutex<World>>) {
+async fn move_mobs_loop(world: Arc<Mutex<World>>) {
     loop {
-        world.lock().unwrap().move_random_mob();
-        sleep(Duration::from_millis(100));
+        world.lock().await.move_random_mob();
+        sleep(Duration::from_millis(100)).await;
     }
 }
 
-fn move_shots_loop(world: Arc<Mutex<World>>) {
+async fn move_shots_loop(world: Arc<Mutex<World>>) {
     loop {
-        world.lock().unwrap().move_shots();
-        sleep(Duration::from_millis(50));
+        world.lock().await.move_shots();
+        sleep(Duration::from_millis(50)).await;
     }
 }
 
-fn show_map_loop(world: Arc<Mutex<World>>, stop: Arc<Mutex<bool>>) {
-    let stdout = stdout();
-    let mut stdout = stdout.lock().into_raw_mode().unwrap();
+async fn show_map_loop(world: Arc<Mutex<World>>, stop: Arc<AtomicBool>) -> Result<()> {
+    let mut stdout = stdout().into_raw_mode()?;
 
-    while !*stop.lock().unwrap() {
+    while !stop.load(std::sync::atomic::Ordering::Relaxed) {
         {
-            let world = world.lock().unwrap();
+            let world = world.lock().await;
 
             write!(
                 stdout,
@@ -72,8 +70,7 @@ fn show_map_loop(world: Arc<Mutex<World>>, stop: Arc<Mutex<bool>>) {
                 termion::clear::All,
                 termion::cursor::Goto(1, 1),
                 world.map_string().as_str()
-            )
-            .unwrap();
+            )?;
 
             let logs = world.get_logs();
             for (i, log) in logs.iter().rev().take(world.height()).enumerate() {
@@ -82,16 +79,15 @@ fn show_map_loop(world: Arc<Mutex<World>>, stop: Arc<Mutex<bool>>) {
                     "{}{}\r\n",
                     termion::cursor::Goto(world.width() as u16 + 2, 1 + i as u16),
                     log
-                )
-                .unwrap();
+                )?;
             }
         }
 
-        stdout.flush().unwrap();
+        stdout.flush()?;
 
-        sleep(Duration::from_millis(100));
+        sleep(Duration::from_millis(100)).await;
     }
-    let world = world.lock().unwrap();
+    let world = world.lock().await;
     if let Some(win) = world.win_status() {
         write!(
             stdout,
@@ -99,9 +95,9 @@ fn show_map_loop(world: Arc<Mutex<World>>, stop: Arc<Mutex<bool>>) {
             termion::cursor::Goto((world.width() as u16) / 2 - 3, (world.height() / 2) as u16),
             if win { "YOU WON!" } else { "YOU DIED!" },
             termion::cursor::Goto(world.width() as u16, world.height() as u16)
-        )
-        .unwrap();
+        )?;
     }
+    Ok(())
 }
 
 /// Candy game
@@ -126,7 +122,8 @@ struct Args {
     candy_cnt: usize,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<()> {
     let args = Args::parse();
     println!("{:?}", args);
 
@@ -136,23 +133,32 @@ fn main() {
         args.mob_cnt,
         args.candy_cnt,
     )));
-    let stop = Arc::new(Mutex::new(false));
+    let stop = Arc::new(AtomicBool::new(false));
 
     {
         let world = world.clone();
-        thread::spawn(move || move_mobs_loop(world));
+        tokio::spawn(async move {
+            move_mobs_loop(world).await;
+        });
     }
     {
         let world = world.clone();
-        thread::spawn(move || move_shots_loop(world));
+        tokio::spawn(async move {
+            move_shots_loop(world).await;
+        });
     }
 
     let world_clone = world.clone();
     let stop_clone = stop.clone();
-    let show_handle = thread::spawn(move || show_map_loop(world_clone, stop_clone));
+    let show_task = tokio::spawn(async move {
+        let _ = show_map_loop(world_clone, stop_clone).await;
+    });
 
-    let read_handle = thread::spawn(move || read_player_movement(world));
-    read_handle.join().unwrap();
-    *stop.lock().unwrap() = true;
-    show_handle.join().unwrap();
+    let read_task = tokio::spawn(async move {
+        let _ = read_player_movement(world).await;
+    });
+    read_task.await?;
+    stop.store(true, std::sync::atomic::Ordering::Relaxed);
+    show_task.await?;
+    Ok(())
 }
