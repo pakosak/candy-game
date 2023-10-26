@@ -28,7 +28,7 @@ async fn read_player_movement(world: Arc<Mutex<World>>) -> Result<()> {
         let mut world = world.lock().await;
 
         match key? {
-            Key::Esc => {
+            Key::Esc | Key::Char('q') | Key::Ctrl('c') => {
                 return Ok(());
             }
             Key::Left => world.move_player(Direction::Left),
