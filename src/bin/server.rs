@@ -47,7 +47,7 @@ struct JoinGameRequest {
 
 #[derive(serde::Serialize)]
 struct JoinGameResponse {
-    player_id: Option<u64>,
+    player_id: u64,
 }
 
 struct Game {
@@ -98,31 +98,26 @@ async fn create_game(
 async fn join_game(
     State(games): State<SharedGames>,
     Json(req): Json<JoinGameRequest>,
-) -> (StatusCode, Json<JoinGameResponse>) {
+) -> impl IntoResponse {
     let mut games = games.lock().await;
     if let Some(game) = games.get_mut(&req.game_id) {
         if game.players.contains(&req.player_name) {
-            error!("Player {} already in game {}", req.player_name, req.game_id);
             return (
                 StatusCode::BAD_REQUEST,
-                Json(JoinGameResponse { player_id: None }),
-            );
+                format!("Player {} already in game {}", req.player_name, req.game_id),
+            )
+                .into_response();
         }
         let player_id = game.world.lock().await.spawn_player();
         game.players.push(req.player_name.clone());
         info!("Player {} joined game {}", req.player_name, req.game_id);
-        (
-            StatusCode::OK,
-            Json(JoinGameResponse {
-                player_id: Some(player_id),
-            }),
-        )
+        (StatusCode::OK, Json(JoinGameResponse { player_id })).into_response()
     } else {
-        error!("Game {} not found", req.game_id);
         (
             StatusCode::NOT_FOUND,
-            Json(JoinGameResponse { player_id: None }),
+            format!("Game {} not found", req.game_id),
         )
+            .into_response()
     }
 }
 

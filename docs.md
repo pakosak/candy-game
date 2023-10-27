@@ -43,7 +43,7 @@ POST /join
 }
 <-
 {
-    "player_id": Option<uint>
+    "player_id": uint
 }
 
 GET /state/{game_id}
