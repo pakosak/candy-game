@@ -17,7 +17,7 @@ use map::Direction;
 use world::World;
 use world_controller::run_world;
 
-async fn read_player_movement(world: Arc<Mutex<World>>) -> Result<()> {
+async fn read_player_movement(world: Arc<Mutex<World>>, player_id: u64) -> Result<()> {
     let mut keys = stdin().keys();
     let mut prev_press = Instant::now();
 
@@ -33,11 +33,11 @@ async fn read_player_movement(world: Arc<Mutex<World>>) -> Result<()> {
             Key::Esc | Key::Char('q') | Key::Ctrl('c') => {
                 return Ok(());
             }
-            Key::Left => world.move_player(Direction::Left),
-            Key::Right => world.move_player(Direction::Right),
-            Key::Up => world.move_player(Direction::Up),
-            Key::Down => world.move_player(Direction::Down),
-            Key::Char(' ') => world.player_shoot(),
+            Key::Left => world.move_player(player_id, Direction::Left),
+            Key::Right => world.move_player(player_id, Direction::Right),
+            Key::Up => world.move_player(player_id, Direction::Up),
+            Key::Down => world.move_player(player_id, Direction::Down),
+            Key::Char(' ') => world.player_shoot(player_id),
             _ => (),
         };
         prev_press = Instant::now();
@@ -121,6 +121,7 @@ async fn main() -> Result<()> {
         args.mob_cnt,
         args.candy_cnt,
     )));
+    let player_id = world.lock().await.spawn_player();
     let stop = Arc::new(AtomicBool::new(false));
 
     run_world(world.clone());
@@ -132,7 +133,7 @@ async fn main() -> Result<()> {
     });
 
     let read_task = tokio::spawn(async move {
-        let _ = read_player_movement(world).await;
+        let _ = read_player_movement(world, player_id).await;
     });
     read_task.await?;
     stop.store(true, std::sync::atomic::Ordering::Relaxed);

@@ -48,7 +48,7 @@ impl Point {
 #[derive(Default)]
 pub struct World {
     map: Map,
-    player: OrientedPoint,
+    players: HashMap<u64, OrientedPoint>,
     exit: Point,
     mobs: HashMap<u64, Point>,
     shots: HashMap<u64, OrientedPoint>,
@@ -69,14 +69,6 @@ impl World {
         w.exit = w.map.random_empty_point();
         w.map.place_object(ObjectType::Exit, &w.exit);
         w.log(format!("Exit placed at {:?}", w.exit));
-
-        w.player = OrientedPoint {
-            point: w.map.random_empty_point(),
-            dir: Direction::Right,
-        };
-        w.map
-            .place_object(ObjectType::Player(Direction::Right), &w.player.point);
-        w.log(format!("Player placed at {:?}", w.player));
 
         for _ in 0..mob_cnt {
             let mob = w.map.random_empty_point();
@@ -164,19 +156,33 @@ impl World {
         });
     }
 
-    pub fn move_player(&mut self, direction: Direction) {
-        let new_pos = self.player.point.step(direction);
-        let obj = self.map.get_object(&new_pos);
-        let new_player = OrientedPoint {
-            point: new_pos,
-            dir: direction,
+    pub fn spawn_player(&mut self) -> u64 {
+        let player = OrientedPoint {
+            point: self.map.random_empty_point(),
+            dir: Direction::Right,
         };
+        self.map
+            .place_object(ObjectType::Player(Direction::Right), &player.point);
+        let player_id = rand::random();
+        self.players.insert(player_id, player);
+        self.log(format!(
+            "Spawned player {} at {:?}",
+            player_id, player.point
+        ));
+        player_id
+    }
+
+    pub fn move_player(&mut self, player_id: u64, direction: Direction) {
+        let mut player = self.players.get_mut(&player_id).unwrap();
+        let new_pos = player.point.step(direction);
+        let obj = self.map.get_object(&new_pos);
+        player.dir = direction;
         match obj.type_ {
             ObjectType::Empty => {
-                self.map.clear_object(&self.player.point);
-                self.player = new_player;
+                self.map.clear_object(&player.point);
+                player.point = new_pos;
                 self.map
-                    .place_object(ObjectType::Player(direction), &self.player.point);
+                    .place_object(ObjectType::Player(direction), &new_pos);
             }
             ObjectType::Exit => {
                 if self.candies_left != 0 {
@@ -186,20 +192,20 @@ impl World {
                     ));
                     return;
                 }
-                self.player = new_player;
+                player.point = new_pos;
                 self.map
-                    .place_object(ObjectType::Player(direction), &self.player.point);
+                    .place_object(ObjectType::Player(direction), &new_pos);
                 self.win = Some(true);
             }
             ObjectType::Mob => {
-                self.map.clear_object(&self.player.point);
+                self.map.clear_object(&player.point);
                 self.win = Some(false);
             }
             ObjectType::Candy => {
-                self.map.clear_object(&self.player.point);
-                self.player = new_player;
+                self.map.clear_object(&player.point);
+                player.point = new_pos;
                 self.map
-                    .place_object(ObjectType::Player(direction), &self.player.point);
+                    .place_object(ObjectType::Player(direction), &new_pos);
                 self.candies_left -= 1;
                 self.log(format!("{} candies left", self.candies_left));
             }
@@ -207,17 +213,18 @@ impl World {
         }
     }
 
-    pub fn player_shoot(&mut self) {
-        let pos = self.player.point.step(self.player.dir);
+    pub fn player_shoot(&mut self, player_id: u64) {
+        let player = self.players.get(&player_id).unwrap();
+        let pos = player.point.step(player.dir);
         if matches!(self.map.get_object(&pos).type_, ObjectType::Empty) {
             let shot_id = rand::random();
             self.map
-                .place_object_with_id(shot_id, ObjectType::Shot(self.player.dir), &pos);
+                .place_object_with_id(shot_id, ObjectType::Shot(player.dir), &pos);
             self.shots.insert(
                 shot_id,
                 OrientedPoint {
                     point: pos,
-                    dir: self.player.dir,
+                    dir: player.dir,
                 },
             );
         }
