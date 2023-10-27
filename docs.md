@@ -7,6 +7,7 @@ movable parts in them and applies client inputs.
 
 ### API
 
+```
 GET /games
 <-
 {
