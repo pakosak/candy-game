@@ -12,8 +12,10 @@ use tokio::time::{sleep, Duration};
 
 mod map;
 mod world;
+mod world_controller;
 use map::Direction;
 use world::World;
+use world_controller::run_world;
 
 async fn read_player_movement(world: Arc<Mutex<World>>) -> Result<()> {
     let mut keys = stdin().keys();
@@ -41,20 +43,6 @@ async fn read_player_movement(world: Arc<Mutex<World>>) -> Result<()> {
         prev_press = Instant::now();
     }
     Ok(())
-}
-
-async fn move_mobs_loop(world: Arc<Mutex<World>>) {
-    loop {
-        world.lock().await.move_random_mob();
-        sleep(Duration::from_millis(100)).await;
-    }
-}
-
-async fn move_shots_loop(world: Arc<Mutex<World>>) {
-    loop {
-        world.lock().await.move_shots();
-        sleep(Duration::from_millis(50)).await;
-    }
 }
 
 async fn show_map_loop(world: Arc<Mutex<World>>, stop: Arc<AtomicBool>) -> Result<()> {
@@ -135,18 +123,7 @@ async fn main() -> Result<()> {
     )));
     let stop = Arc::new(AtomicBool::new(false));
 
-    {
-        let world = world.clone();
-        tokio::spawn(async move {
-            move_mobs_loop(world).await;
-        });
-    }
-    {
-        let world = world.clone();
-        tokio::spawn(async move {
-            move_shots_loop(world).await;
-        });
-    }
+    run_world(world.clone());
 
     let world_clone = world.clone();
     let stop_clone = stop.clone();
