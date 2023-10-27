@@ -174,12 +174,13 @@ impl World {
 
     pub fn move_player(&mut self, player_id: u64, direction: Direction) {
         let mut player = self.players.get_mut(&player_id).unwrap();
-        let new_pos = player.point.step(direction);
+        let old_pos = player.point;
+        let new_pos = old_pos.step(direction);
         let obj = self.map.get_object(&new_pos);
         player.dir = direction;
         match obj.type_ {
             ObjectType::Empty => {
-                self.map.clear_object(&player.point);
+                self.map.clear_object(&old_pos);
                 player.point = new_pos;
                 self.map
                     .place_object(ObjectType::Player(direction), &new_pos);
@@ -190,6 +191,8 @@ impl World {
                         "You need to collect {} more candies",
                         self.candies_left
                     ));
+                    self.map
+                        .place_object(ObjectType::Player(direction), &old_pos);
                     return;
                 }
                 player.point = new_pos;
@@ -198,18 +201,21 @@ impl World {
                 self.win = Some(true);
             }
             ObjectType::Mob => {
-                self.map.clear_object(&player.point);
+                self.map.clear_object(&old_pos);
                 self.win = Some(false);
             }
             ObjectType::Candy => {
-                self.map.clear_object(&player.point);
+                self.map.clear_object(&old_pos);
                 player.point = new_pos;
                 self.map
                     .place_object(ObjectType::Player(direction), &new_pos);
                 self.candies_left -= 1;
                 self.log(format!("{} candies left", self.candies_left));
             }
-            _ => (),
+            _ => {
+                self.map
+                    .place_object(ObjectType::Player(direction), &old_pos);
+            }
         }
     }
 
