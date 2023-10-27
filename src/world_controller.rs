@@ -15,7 +15,6 @@ pub fn run_world(world: Arc<Mutex<World>>) {
         });
     }
     {
-        let world = world.clone();
         tokio::spawn(async move {
             loop {
                 world.lock().await.move_shots();
