@@ -67,6 +67,7 @@ Action =
 GET /state/{game_id}
 <-
 string
+```
 
 ## Client
 
