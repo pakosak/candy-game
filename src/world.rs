@@ -220,7 +220,10 @@ impl World {
     }
 
     pub fn player_shoot(&mut self, player_id: u64) {
-        let player = self.players.get(&player_id).unwrap();
+        let player = self
+            .players
+            .get(&player_id)
+            .unwrap_or_else(|| panic!("Player {} not found", player_id));
         let pos = player.point.step(player.dir);
         if matches!(self.map.get_object(&pos).type_, ObjectType::Empty) {
             let shot_id = rand::random();

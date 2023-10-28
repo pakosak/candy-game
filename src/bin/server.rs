@@ -52,7 +52,7 @@ struct JoinGameResponse {
 
 struct Game {
     name: String,
-    players: Vec<String>,
+    players: HashMap<u64, String>,
     world: Arc<Mutex<World>>,
 }
 
@@ -64,7 +64,7 @@ async fn list_games(State(games): State<SharedGames>) -> Json<GetGamesResponse> 
         resp.games.push(GameInfo {
             id: *id,
             name: game.name.clone(),
-            players: game.players.clone(),
+            players: game.players.values().cloned().collect::<Vec<String>>(),
             finished: game.world.lock().await.win_status().is_some(),
         });
     }
@@ -81,7 +81,7 @@ async fn create_game(
         game_id,
         Game {
             name: req.name.clone(),
-            players: Vec::new(),
+            players: HashMap::new(),
             world: Arc::new(Mutex::new(World::new(
                 req.width,
                 req.height,
@@ -101,7 +101,7 @@ async fn join_game(
 ) -> impl IntoResponse {
     let mut games = games.lock().await;
     if let Some(game) = games.get_mut(&req.game_id) {
-        if game.players.contains(&req.player_name) {
+        if game.players.values().any(|val| val == &req.player_name) {
             return (
                 StatusCode::BAD_REQUEST,
                 format!("Player {} already in game {}", req.player_name, req.game_id),
@@ -109,7 +109,7 @@ async fn join_game(
                 .into_response();
         }
         let player_id = game.world.lock().await.spawn_player();
-        game.players.push(req.player_name.clone());
+        game.players.insert(player_id, req.player_name.clone());
         info!("Player {} joined game {}", req.player_name, req.game_id);
         (StatusCode::OK, Json(JoinGameResponse { player_id })).into_response()
     } else {
