@@ -116,15 +116,18 @@ impl World {
         }
         if let Some((_, mob_pos)) = self.mobs.iter_mut().nth(rand::random::<usize>() % mob_cnt) {
             let new_pos = mob_pos.step(rand::random());
-            let obj = self.map.get_object(&new_pos);
-            match obj.type_ {
+            let collided_obj = self.map.get_object(&new_pos);
+            match collided_obj.type_ {
                 ObjectType::Empty => {
                     self.map.swap_objects(mob_pos, &new_pos);
                     mob_pos.update(new_pos);
                 }
                 ObjectType::Player(_) => {
+                    self.players.remove(&collided_obj.id);
+                    self.dead_players.push(collided_obj.id);
+                    self.map.swap_objects(mob_pos, &new_pos);
                     self.map.clear_object(mob_pos);
-                    self.win = Some(false);
+                    mob_pos.update(new_pos);
                 }
                 _ => (),
             }
@@ -173,17 +176,17 @@ impl World {
     }
 
     pub fn move_player(&mut self, player_id: u64, direction: Direction) {
-        let mut player = self.players.get_mut(&player_id).unwrap();
-        let old_pos = player.point;
-        let new_pos = old_pos.step(direction);
-        let obj = self.map.get_object(&new_pos);
+        let mut player = self
+            .players
+            .remove(&player_id)
+            .unwrap_or_else(|| panic!("Player {} not found", player_id));
         player.dir = direction;
-        match obj.type_ {
+        let new_pos = player.point.step(direction);
+        let collider_obj = self.map.get_object(&new_pos);
+        match collider_obj.type_ {
             ObjectType::Empty => {
-                self.map.clear_object(&old_pos);
+                self.map.clear_object(&player.point);
                 player.point = new_pos;
-                self.map
-                    .place_object(ObjectType::Player(direction), &new_pos);
             }
             ObjectType::Exit => {
                 if self.candies_left != 0 {
@@ -191,32 +194,28 @@ impl World {
                         "You need to collect {} more candies",
                         self.candies_left
                     ));
-                    self.map
-                        .place_object(ObjectType::Player(direction), &old_pos);
-                    return;
+                } else {
+                    player.point = new_pos;
+                    self.finished = true;
                 }
-                player.point = new_pos;
-                self.map
-                    .place_object(ObjectType::Player(direction), &new_pos);
-                self.win = Some(true);
             }
             ObjectType::Mob => {
-                self.map.clear_object(&old_pos);
-                self.win = Some(false);
+                self.players.remove(&player_id);
+                self.dead_players.push(player_id);
+                self.map.clear_object(&player.point);
+                return;
             }
             ObjectType::Candy => {
-                self.map.clear_object(&old_pos);
+                self.map.clear_object(&player.point);
                 player.point = new_pos;
-                self.map
-                    .place_object(ObjectType::Player(direction), &new_pos);
                 self.candies_left -= 1;
                 self.log(format!("{} candies left", self.candies_left));
             }
-            _ => {
-                self.map
-                    .place_object(ObjectType::Player(direction), &old_pos);
-            }
+            _ => {}
         }
+        self.map
+            .place_object(ObjectType::Player(direction), &player.point);
+        self.players.insert(player_id, player);
     }
 
     pub fn player_shoot(&mut self, player_id: u64) {
