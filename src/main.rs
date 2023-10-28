@@ -21,7 +21,7 @@ async fn read_player_movement(world: Arc<Mutex<World>>, player_id: u64) -> Resul
     let mut keys = stdin().keys();
     let mut prev_press = Instant::now();
 
-    while world.lock().await.win_status().is_none() {
+    while world.lock().await.can_play(player_id) {
         let key = keys.next().ok_or(anyhow::anyhow!("No key pressed"))?;
 
         if prev_press.elapsed() < Duration::from_millis(100) {
@@ -45,23 +45,34 @@ async fn read_player_movement(world: Arc<Mutex<World>>, player_id: u64) -> Resul
     Ok(())
 }
 
-async fn show_map_loop(world: Arc<Mutex<World>>, stop: Arc<AtomicBool>) -> Result<()> {
+async fn show_map_loop(
+    world: Arc<Mutex<World>>,
+    stop: Arc<AtomicBool>,
+    player_id: u64,
+) -> Result<()> {
     let mut stdout = stdout().into_raw_mode()?;
 
     while !stop.load(std::sync::atomic::Ordering::Relaxed) {
         {
             let world = world.lock().await;
 
+            let world_state = world.get_state();
+
             write!(
                 stdout,
                 "{}{}{}",
                 termion::clear::All,
                 termion::cursor::Goto(1, 1),
-                world.map_string().as_str()
+                world_state.map
             )?;
 
-            let logs = world.get_logs();
-            for (i, log) in logs.iter().rev().take(world.height()).enumerate() {
+            for (i, log) in world_state
+                .logs
+                .iter()
+                .rev()
+                .take(world.height())
+                .enumerate()
+            {
                 write!(
                     stdout,
                     "{}{}\r\n",
@@ -76,12 +87,17 @@ async fn show_map_loop(world: Arc<Mutex<World>>, stop: Arc<AtomicBool>) -> Resul
         sleep(Duration::from_millis(100)).await;
     }
     let world = world.lock().await;
-    if let Some(win) = world.win_status() {
+    if !world.can_play(player_id) {
+        let world_state = world.get_state();
         write!(
             stdout,
             "{}{}{}",
             termion::cursor::Goto((world.width() as u16) / 2 - 3, (world.height() / 2) as u16),
-            if win { "YOU WON!" } else { "YOU DIED!" },
+            if world_state.dead_players.contains(&player_id) {
+                "YOU DIED!"
+            } else {
+                "YOU WON!"
+            },
             termion::cursor::Goto(world.width() as u16, world.height() as u16)
         )?;
     }
@@ -129,7 +145,7 @@ async fn main() -> Result<()> {
     let world_clone = world.clone();
     let stop_clone = stop.clone();
     let show_task = tokio::spawn(async move {
-        let _ = show_map_loop(world_clone, stop_clone).await;
+        let _ = show_map_loop(world_clone, stop_clone, player_id).await;
     });
 
     let read_task = tokio::spawn(async move {

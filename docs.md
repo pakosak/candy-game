@@ -66,7 +66,12 @@ Action =
 
 GET /state/{game_id}
 <-
-string
+{
+    "map": string,
+    "finished": bool,
+    "dead_players": [string, ...],
+    "logs": [string, ...]
+}
 ```
 
 ## Client

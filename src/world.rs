@@ -45,6 +45,14 @@ impl Point {
     }
 }
 
+#[derive(serde::Serialize)]
+pub struct WorldState<'a> {
+    pub map: String,
+    pub finished: bool,
+    pub dead_players: Vec<u64>,
+    pub logs: &'a Vec<String>,
+}
+
 #[derive(Default)]
 pub struct World {
     map: Map,
@@ -53,9 +61,10 @@ pub struct World {
     mobs: HashMap<u64, Point>,
     shots: HashMap<u64, OrientedPoint>,
 
-    win: Option<bool>,
+    finished: bool,
+    dead_players: Vec<u64>,
     candies_left: usize,
-    log: Vec<String>,
+    logs: Vec<String>,
 }
 
 impl World {
@@ -85,16 +94,17 @@ impl World {
         w
     }
 
-    pub fn win_status(&self) -> Option<bool> {
-        self.win
+    pub fn can_play(&self, player_id: u64) -> bool {
+        !self.finished && !self.dead_players.contains(&player_id)
     }
 
-    pub fn map_string(&self) -> String {
-        self.map.format()
-    }
-
-    pub fn get_logs(&self) -> &Vec<String> {
-        self.log.as_ref()
+    pub fn get_state(&self) -> WorldState {
+        WorldState {
+            map: self.map.format(),
+            finished: self.finished,
+            dead_players: self.dead_players.clone(),
+            logs: &self.logs,
+        }
     }
 
     pub fn width(&self) -> usize {
@@ -106,7 +116,7 @@ impl World {
     }
 
     fn log(&mut self, msg: String) {
-        self.log.push(msg);
+        self.logs.push(msg);
     }
 
     pub fn move_random_mob(&mut self) {
@@ -150,6 +160,9 @@ impl World {
                     self.map.clear_object(&shot.point);
                     self.map.clear_object(&new_pos);
                     false
+                }
+                ObjectType::Player(_) => {
+                    todo!("kill other player");
                 }
                 _ => {
                     self.map.clear_object(&shot.point);

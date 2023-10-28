@@ -79,7 +79,7 @@ async fn list_games(State(games): State<SharedGames>) -> Json<GetGamesResponse> 
             id: *id,
             name: game.name.clone(),
             players: game.players.values().cloned().collect::<Vec<String>>(),
-            finished: game.world.lock().await.win_status().is_some(),
+            finished: game.world.lock().await.get_state().finished,
         });
     }
     Json(resp)
@@ -140,7 +140,7 @@ async fn game_state(
     Path(game_id): Path<u64>,
 ) -> impl IntoResponse {
     if let Some(game) = games.lock().await.get(&game_id) {
-        (StatusCode::OK, game.world.lock().await.map_string()).into_response()
+        (StatusCode::OK, Json(game.world.lock().await.get_state())).into_response()
     } else {
         (StatusCode::NOT_FOUND, format!("Game {} not found", game_id)).into_response()
     }
@@ -152,10 +152,18 @@ async fn do_action(
 ) -> impl IntoResponse {
     if let Some(game) = games.lock().await.get_mut(&req.game_id) {
         let mut world = game.world.lock().await;
-        if world.win_status().is_some() {
+        let state = world.get_state();
+        if state.finished {
             return (
                 StatusCode::BAD_REQUEST,
                 format!("Game {} already finished", req.game_id),
+            )
+                .into_response();
+        }
+        if state.dead_players.contains(&req.player_id) {
+            return (
+                StatusCode::BAD_REQUEST,
+                format!("Player {} already dead", req.player_id),
             )
                 .into_response();
         }
