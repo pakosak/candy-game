@@ -46,11 +46,27 @@ POST /join
     "player_id": uint
 }
 
+POST /action
+->
+{
+    "game_id": uint,
+    "player_id": uint,
+    "action": Action
+}
+
+Action =
+{
+    "type": "shoot"
+}
+|
+{
+    "type": "move",
+    "direction": "up" | "down" | "left" | "right"
+}
+
 GET /state/{game_id}
 <-
-{
-
-}
+string
 
 ## Client
 

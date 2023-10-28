@@ -12,7 +12,8 @@ pub struct OrientedPoint {
     pub dir: Direction,
 }
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase", tag = "direction")]
 pub enum Direction {
     #[default]
     Up,

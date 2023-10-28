@@ -3,12 +3,12 @@ use anyhow::Result;
 use axum::extract::{Path, State};
 use axum::{
     http::StatusCode,
-    response::{self, IntoResponse},
+    response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
-use env_logger;
-use log::{error, info};
+use log::info;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -17,7 +17,7 @@ use tokio::sync::Mutex;
 use game::world::World;
 use game::world_controller::run_world;
 
-#[derive(serde::Serialize)]
+#[derive(Serialize)]
 struct GameInfo {
     id: u64,
     name: String,
@@ -25,12 +25,12 @@ struct GameInfo {
     finished: bool,
 }
 
-#[derive(serde::Serialize)]
+#[derive(Serialize)]
 struct GetGamesResponse {
     games: Vec<GameInfo>,
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 struct CreateGameRequest {
     name: String,
     width: usize,
@@ -39,15 +39,29 @@ struct CreateGameRequest {
     candy_cnt: usize,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct JoinGameRequest {
     game_id: u64,
     player_name: String,
 }
 
-#[derive(serde::Serialize)]
+#[derive(Serialize)]
 struct JoinGameResponse {
     player_id: u64,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
+enum PlayerAction {
+    Shoot,
+    Move(game::map::Direction),
+}
+
+#[derive(Deserialize)]
+struct ActionRequest {
+    game_id: u64,
+    player_id: u64,
+    action: PlayerAction,
 }
 
 struct Game {
@@ -132,6 +146,40 @@ async fn game_state(
     }
 }
 
+async fn do_action(
+    State(games): State<SharedGames>,
+    Json(req): Json<ActionRequest>,
+) -> impl IntoResponse {
+    if let Some(game) = games.lock().await.get_mut(&req.game_id) {
+        let mut world = game.world.lock().await;
+        if world.win_status().is_some() {
+            return (
+                StatusCode::BAD_REQUEST,
+                format!("Game {} already finished", req.game_id),
+            )
+                .into_response();
+        }
+        if !game.players.contains_key(&req.player_id) {
+            return (
+                StatusCode::BAD_REQUEST,
+                format!("Player {} not in game {}", req.player_id, req.game_id),
+            )
+                .into_response();
+        }
+        match req.action {
+            PlayerAction::Shoot => world.player_shoot(req.player_id),
+            PlayerAction::Move(dir) => world.move_player(req.player_id, dir),
+        }
+        (StatusCode::OK, "OK").into_response()
+    } else {
+        (
+            StatusCode::NOT_FOUND,
+            format!("Game {} not found", req.game_id),
+        )
+            .into_response()
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::Builder::new()
@@ -145,6 +193,7 @@ async fn main() -> Result<()> {
         .route("/games", get(list_games))
         .route("/create", post(create_game))
         .route("/join", post(join_game))
+        .route("/action", post(do_action))
         .with_state(games);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3030));
