@@ -20,7 +20,7 @@ termion = "2.0.1"
 tokio = { version = "1.33.0", features = ["full"] }
 
 [lib]
-name = "game"
+name = "candy_game"
 path = "src/lib.rs"
 
 [[bin]]

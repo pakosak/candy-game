@@ -10,12 +10,10 @@ use termion::raw::IntoRawMode;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
 
-mod map;
-mod world;
-mod world_controller;
-use map::Direction;
-use world::World;
-use world_controller::run_world;
+mod game;
+use game::map::Direction;
+use game::world::World;
+use game::world_controller::run_world;
 
 async fn read_player_movement(world: Arc<Mutex<World>>, player_id: u64) -> Result<()> {
     let mut keys = stdin().keys();

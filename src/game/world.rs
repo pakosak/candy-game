@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::map::{Direction, Map, ObjectType, OrientedPoint, Point};
+use crate::game::map::{Direction, Map, ObjectType, OrientedPoint, Point};
 
 use rand::{
     distributions::{Distribution, Standard},

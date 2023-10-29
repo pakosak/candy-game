@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::map::Direction;
+use crate::game::map::Direction;
 
 #[derive(Serialize, Debug, Deserialize)]
 pub struct GameInfo {

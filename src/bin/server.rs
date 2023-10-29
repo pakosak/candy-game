@@ -13,9 +13,9 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use game::api::*;
-use game::world::World;
-use game::world_controller::run_world;
+use candy_game::game::api::*;
+use candy_game::game::world::World;
+use candy_game::game::world_controller::run_world;
 
 struct Game {
     name: String,
