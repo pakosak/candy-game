@@ -8,61 +8,14 @@ use axum::{
     Json, Router,
 };
 use log::info;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+use game::api::*;
 use game::world::World;
 use game::world_controller::run_world;
-
-#[derive(Serialize)]
-struct GameInfo {
-    id: u64,
-    name: String,
-    players: Vec<String>,
-    finished: bool,
-}
-
-#[derive(Serialize)]
-struct GetGamesResponse {
-    games: Vec<GameInfo>,
-}
-
-#[derive(Deserialize, Debug)]
-struct CreateGameRequest {
-    name: String,
-    width: usize,
-    height: usize,
-    mob_cnt: usize,
-    candy_cnt: usize,
-}
-
-#[derive(Deserialize)]
-struct JoinGameRequest {
-    game_id: u64,
-    player_name: String,
-}
-
-#[derive(Serialize)]
-struct JoinGameResponse {
-    player_id: u64,
-}
-
-#[derive(Deserialize)]
-#[serde(tag = "type", rename_all = "lowercase")]
-enum PlayerAction {
-    Shoot,
-    Move(game::map::Direction),
-}
-
-#[derive(Deserialize)]
-struct ActionRequest {
-    game_id: u64,
-    player_id: u64,
-    action: PlayerAction,
-}
 
 struct Game {
     name: String,
@@ -106,6 +59,7 @@ async fn create_game(
     );
     run_world(Arc::clone(&games.get(&game_id).unwrap().world));
     info!("Game {} created using {:?}", game_id, req);
+    todo!("return game id");
     StatusCode::OK
 }
 
