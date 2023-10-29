@@ -15,13 +15,18 @@ pub struct GetGamesResponse {
     pub games: Vec<GameInfo>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct CreateGameRequest {
     pub name: String,
     pub width: usize,
     pub height: usize,
     pub mob_cnt: usize,
     pub candy_cnt: usize,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CreateGameResponse {
+    pub game_id: u64,
 }
 
 #[derive(Deserialize)]

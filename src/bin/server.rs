@@ -41,7 +41,7 @@ async fn list_games(State(games): State<SharedGames>) -> Json<GetGamesResponse> 
 async fn create_game(
     State(games): State<SharedGames>,
     Json(req): Json<CreateGameRequest>,
-) -> StatusCode {
+) -> Json<CreateGameResponse> {
     let mut games = games.lock().await;
     let game_id = games.len() as u64;
     games.insert(
@@ -59,8 +59,7 @@ async fn create_game(
     );
     run_world(Arc::clone(&games.get(&game_id).unwrap().world));
     info!("Game {} created using {:?}", game_id, req);
-    todo!("return game id");
-    StatusCode::OK
+    Json(CreateGameResponse { game_id })
 }
 
 async fn join_game(
