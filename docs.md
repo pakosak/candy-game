@@ -2,8 +2,9 @@
 
 ## Server
 
-Keeps a list of running games, with their states + worlds. Automatically updates all
-movable parts in them and applies client inputs.
+Keeps a list of running games, their worlds and current/past players. Automatically updates all
+movable parts in the worlds and applies client inputs. Allows game listing, creating, polling
+and application of actions.
 
 ### API
 
@@ -72,6 +73,9 @@ GET /state/{game_id}
     "dead_players": [string, ...],
     "logs": [string, ...]
 }
+
+GET /ping/{game_id}/{player_id}
+
 ```
 
 ## Client
