@@ -74,8 +74,6 @@ GET /state/{game_id}
     "logs": [string, ...]
 }
 
-GET /ping/{game_id}/{player_id}
-
 ```
 
 ## Client

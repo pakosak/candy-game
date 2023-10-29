@@ -9,6 +9,7 @@ edition = "2021"
 anyhow = "1.0.75"
 axum = "0.6.20"
 clap = { version = "4.4.6", features = ["derive"] }
+dialoguer = "0.11.0"
 env_logger = "0.10.0"
 log = "0.4.20"
 prettytable-rs = "0.10.0"
