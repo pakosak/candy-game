@@ -44,6 +44,24 @@ async fn list_games(server: &str) -> Result<()> {
     Ok(())
 }
 
+async fn create_game(server: &str) -> Result<()> {
+    let url = format!("http://{}/create", server);
+    let req = CreateGameRequest {
+        name: "My game".to_string(),
+        width: 50,
+        height: 20,
+        mob_cnt: 10,
+        candy_cnt: 5,
+    };
+    let resp: CreateGameResponse = reqwest::Client::new()
+        .post(&url)
+        .json(&req)
+        .send()
+        .await?
+        .json()
+        .await?;
+    println!("Game created: {}", resp.game_id);
+    Ok(())
 }
 
 #[tokio::main]
@@ -53,6 +71,8 @@ async fn main() -> Result<()> {
 
     if args.command == "list" {
         list_games(&args.server).await?;
+    } else if args.command == "create" {
+        create_game(&args.server).await?;
     } else {
         println!("Unknown command: {}", args.command);
     }
