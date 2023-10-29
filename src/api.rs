@@ -53,3 +53,17 @@ pub struct ActionRequest {
     pub player_id: u64,
     pub action: PlayerAction,
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct GetStateRequest {
+    pub game_id: u64,
+    pub player_id: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GetStateResponse {
+    pub map: String,
+    pub finished: bool,
+    pub is_dead: bool,
+    pub logs: Vec<String>,
+}

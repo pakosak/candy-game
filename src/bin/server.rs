@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use axum::extract::{Path, State};
+use axum::extract::State;
 use axum::{
     http::StatusCode,
     response::IntoResponse,
@@ -90,12 +90,24 @@ async fn join_game(
 
 async fn game_state(
     State(games): State<SharedGames>,
-    Path(game_id): Path<u64>,
+    Json(req): Json<GetStateRequest>,
 ) -> impl IntoResponse {
-    if let Some(game) = games.lock().await.get(&game_id) {
-        (StatusCode::OK, Json(game.world.lock().await.get_state())).into_response()
+    if let Some(game) = games.lock().await.get(&req.game_id) {
+        let world = game.world.lock().await;
+        let state = world.get_state();
+        let resp = GetStateResponse {
+            map: state.map,
+            finished: state.finished,
+            is_dead: state.dead_players.contains(&req.player_id),
+            logs: state.logs.clone(),
+        };
+        (StatusCode::OK, Json(resp)).into_response()
     } else {
-        (StatusCode::NOT_FOUND, format!("Game {} not found", game_id)).into_response()
+        (
+            StatusCode::NOT_FOUND,
+            format!("Game {} not found", req.game_id),
+        )
+            .into_response()
     }
 }
 
@@ -150,11 +162,11 @@ async fn main() -> Result<()> {
     let games: SharedGames = Arc::new(Mutex::new(HashMap::new()));
 
     let app = Router::new()
-        .route("/state/:game_id", get(game_state))
         .route("/games", get(list_games))
         .route("/create", post(create_game))
         .route("/join", post(join_game))
         .route("/action", post(do_action))
+        .route("/state", post(game_state))
         .with_state(games);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3030));

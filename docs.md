@@ -65,7 +65,12 @@ Action =
     "direction": "up" | "down" | "left" | "right"
 }
 
-GET /state/{game_id}
+POST /state
+->
+{
+    "game_id": uint,
+    "player_id": uint
+}
 <-
 {
     "map": string,
