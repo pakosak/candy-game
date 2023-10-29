@@ -1,12 +1,13 @@
 use anyhow::Result;
 use clap::Parser;
+use prettytable::{row, Cell, Row, Table};
 
 use game::api::*;
 
 /// Candy game
 /// Collect all candies and exit the map
 /// Connect to a remote server and execute one of commands
-/// Controls: arrows - move, space - shoot
+/// Controls after joining: arrows - move, space - shoot
 /// Press Esc/q to exit
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -19,10 +20,30 @@ struct Args {
     command: String,
 }
 
-async fn list_games(server: &str) -> Result<Vec<GameInfo>> {
+async fn list_games(server: &str) -> Result<()> {
     let url = format!("http://{}/games", server);
     let resp: GetGamesResponse = reqwest::get(&url).await?.json().await?;
-    Ok(resp.games)
+
+    let mut table = Table::new();
+    table.add_row(Row::new(vec![
+        Cell::new("ID"),
+        Cell::new("Name"),
+        Cell::new("Players"),
+        Cell::new("Finished"),
+    ]));
+    for game in resp.games {
+        table.add_row(row!(
+            &game.id.to_string(),
+            &game.name,
+            &game.players.join(", "),
+            if game.finished { "Yes" } else { "No" }
+        ));
+    }
+    table.printstd();
+
+    Ok(())
+}
+
 }
 
 #[tokio::main]
@@ -31,8 +52,7 @@ async fn main() -> Result<()> {
     println!("{:?}", args);
 
     if args.command == "list" {
-        let games = list_games(&args.server).await;
-        println!("Games: {:?}", games);
+        list_games(&args.server).await?;
     } else {
         println!("Unknown command: {}", args.command);
     }
