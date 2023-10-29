@@ -29,13 +29,13 @@ pub struct CreateGameResponse {
     pub game_id: u64,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct JoinGameRequest {
     pub game_id: u64,
     pub player_name: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct JoinGameResponse {
     pub player_id: u64,
 }
