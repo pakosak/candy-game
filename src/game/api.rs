@@ -40,14 +40,14 @@ pub struct JoinGameResponse {
     pub player_id: u64,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum PlayerAction {
     Shoot,
     Move(Direction),
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ActionRequest {
     pub game_id: u64,
     pub player_id: u64,
