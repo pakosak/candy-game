@@ -38,6 +38,9 @@ pub struct JoinGameRequest {
 #[derive(Serialize, Deserialize)]
 pub struct JoinGameResponse {
     pub player_id: u64,
+    pub width: usize,
+    pub height: usize,
+    // also send immovable objects and later only send moving parts
 }
 
 #[derive(Serialize, Deserialize)]

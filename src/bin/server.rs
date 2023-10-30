@@ -75,10 +75,19 @@ async fn join_game(
             )
                 .into_response();
         }
-        let player_id = game.world.lock().await.spawn_player();
+        let mut world = game.world.lock().await;
+        let player_id = world.spawn_player();
         game.players.insert(player_id, req.player_name.clone());
         info!("Player {} joined game {}", req.player_name, req.game_id);
-        (StatusCode::OK, Json(JoinGameResponse { player_id })).into_response()
+        (
+            StatusCode::OK,
+            Json(JoinGameResponse {
+                player_id,
+                width: world.width(),
+                height: world.height(),
+            }),
+        )
+            .into_response()
     } else {
         (
             StatusCode::NOT_FOUND,

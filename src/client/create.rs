@@ -48,6 +48,6 @@ pub async fn create_game(server: &str) -> Result<()> {
         .expect("Couldn't connect to server to create game")
         .json()
         .await?;
-    println!("Game created: {}", resp.game_id);
+    println!("Created game with id: {}", resp.game_id);
     Ok(())
 }

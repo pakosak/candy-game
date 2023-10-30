@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Result};
 use dialoguer::Input;
-use log::error;
 use std::io::{stdin, stdout, Write};
 use termion::event::Key;
 use termion::input::TermRead;
@@ -86,7 +85,13 @@ async fn handle_player_input(server: &str, game_id: u64, player_id: u64) -> Resu
     Ok(())
 }
 
-async fn show_map_loop(server: &str, game_id: u64, player_id: u64) -> Result<()> {
+async fn show_map_loop(
+    server: &str,
+    game_id: u64,
+    player_id: u64,
+    width: usize,
+    height: usize,
+) -> Result<()> {
     let mut stdout = stdout().into_raw_mode()?;
 
     let client = reqwest::Client::new();
@@ -112,6 +117,15 @@ async fn show_map_loop(server: &str, game_id: u64, player_id: u64) -> Result<()>
             state.map
         )?;
 
+        for (i, log) in state.logs.iter().rev().take(height).enumerate() {
+            write!(
+                stdout,
+                "{}{}\r\n",
+                termion::cursor::Goto(width as u16 + 2, 1 + i as u16),
+                log
+            )?;
+        }
+
         stdout.flush()?;
 
         sleep(Duration::from_millis(100)).await;
@@ -132,19 +146,22 @@ pub async fn join_game(server: &str) -> Result<()> {
         player_name,
     };
 
-    let resp: JoinGameResponse = reqwest::Client::new()
+    let resp = reqwest::Client::new()
         .post(&url)
         .json(&req)
         .send()
         .await
-        .expect("Couldn't connect to server to join game")
-        .error_for_status()?
-        .json()
-        .await?;
+        .expect("Couldn't connect to server to join game");
+
+    if resp.status().is_client_error() {
+        println!("Error joining game: {}", resp.text().await?);
+        return Ok(());
+    }
+    let resp: JoinGameResponse = resp.json().await?;
     println!("Joined with player id: {}", resp.player_id);
 
     tokio::select! {
-        _ = show_map_loop(server, game_id, resp.player_id) => {},
+        _ = show_map_loop(server, game_id, resp.player_id, resp.width, resp.height) => {},
         _ = handle_player_input(server, game_id, resp.player_id) => {},
     };
 
