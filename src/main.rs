@@ -135,7 +135,7 @@ async fn main() -> Result<()> {
         args.mob_cnt,
         args.candy_cnt,
     )));
-    let player_id = world.lock().await.spawn_player();
+    let player_id = world.lock().await.spawn_player("local");
     let stop = Arc::new(AtomicBool::new(false));
 
     run_world(world.clone());

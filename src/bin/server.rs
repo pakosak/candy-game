@@ -76,9 +76,12 @@ async fn join_game(
                 .into_response();
         }
         let mut world = game.world.lock().await;
-        let player_id = world.spawn_player();
+        let player_id = world.spawn_player(req.player_name.as_str());
         game.players.insert(player_id, req.player_name.clone());
-        info!("Player {} joined game {}", req.player_name, req.game_id);
+        info!(
+            "Player {} with id {} joined game {}",
+            req.player_name, player_id, req.game_id
+        );
         (
             StatusCode::OK,
             Json(JoinGameResponse {

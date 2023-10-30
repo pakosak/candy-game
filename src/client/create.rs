@@ -13,7 +13,7 @@ fn read_create_game_input() -> Result<CreateGameRequest> {
 
     let height: usize = Input::new()
         .with_prompt("Height")
-        .default(50)
+        .default(20)
         .interact_text()?;
 
     let mob_cnt: usize = Input::new()

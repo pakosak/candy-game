@@ -125,6 +125,11 @@ async fn show_map_loop(
                 log
             )?;
         }
+        write!(
+            stdout,
+            "{}",
+            termion::cursor::Goto(width as u16, height as u16),
+        )?;
 
         stdout.flush()?;
 
