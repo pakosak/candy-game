@@ -235,8 +235,8 @@ impl World {
             ObjectType::Exit => {
                 if self.candies_left != 0 {
                     self.log(format!(
-                        "You need to collect {} more candies",
-                        self.candies_left
+                        "You need to collect {} more candies, {}",
+                        self.candies_left, self.player_names[&player_id]
                     ));
                 } else {
                     self.log(format!(
@@ -307,9 +307,14 @@ impl World {
     }
 
     pub fn erase_player(&mut self, player_id: u64) {
+        self.log(format!(
+            "Player {} left the game",
+            self.player_names[&player_id]
+        ));
         if let Some(player) = self.players.remove(&player_id) {
             self.map.clear_object(&player.point);
         }
+        self.player_names.remove(&player_id);
         self.dead_players.retain(|player| *player != player_id);
     }
 }

@@ -18,7 +18,7 @@ use candy_game::game::api::*;
 use candy_game::game::world::World;
 use candy_game::game::world_controller::run_world;
 
-const CLIENT_MAX_PING_S: u64 = 10;
+const CLIENT_MAX_PING_S: u64 = 5;
 
 struct Game {
     name: String,
