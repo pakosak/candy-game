@@ -284,4 +284,11 @@ impl World {
             _ => (),
         }
     }
+
+    pub fn erase_player(&mut self, player_id: u64) {
+        if let Some(player) = self.players.remove(&player_id) {
+            self.map.clear_object(&player.point);
+        }
+        self.dead_players.retain(|player| *player != player_id);
+    }
 }

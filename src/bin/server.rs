@@ -12,14 +12,18 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tokio::time::Instant;
 
 use candy_game::game::api::*;
 use candy_game::game::world::World;
 use candy_game::game::world_controller::run_world;
 
+const CLIENT_MAX_PING_S: u64 = 10;
+
 struct Game {
     name: String,
     players: HashMap<u64, String>,
+    players_last_seen: HashMap<u64, Instant>,
     world: Arc<Mutex<World>>,
 }
 
@@ -49,6 +53,7 @@ async fn create_game(
         Game {
             name: req.name.clone(),
             players: HashMap::new(),
+            players_last_seen: HashMap::new(),
             world: Arc::new(Mutex::new(World::new(
                 req.width,
                 req.height,
@@ -104,7 +109,9 @@ async fn game_state(
     State(games): State<SharedGames>,
     Json(req): Json<GetStateRequest>,
 ) -> impl IntoResponse {
-    if let Some(game) = games.lock().await.get(&req.game_id) {
+    if let Some(game) = games.lock().await.get_mut(&req.game_id) {
+        game.players_last_seen.insert(req.player_id, Instant::now());
+
         let world = game.world.lock().await;
         let state = world.get_state();
         let resp = GetStateResponse {
@@ -165,6 +172,35 @@ async fn do_action(
     }
 }
 
+async fn clean_idle_players(games: SharedGames) {
+    loop {
+        let mut games = games.lock().await;
+        for game in games.values_mut() {
+            let idle_players: Vec<u64> = game
+                .players_last_seen
+                .iter()
+                .filter_map(|(id, last_seen)| {
+                    if last_seen.elapsed().as_secs() > CLIENT_MAX_PING_S {
+                        Some(*id)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            for player_id in idle_players {
+                info!(
+                    "Player {} ({}) removed from game {}",
+                    player_id, game.players[&player_id], game.name
+                );
+                game.world.lock().await.erase_player(player_id);
+                game.players_last_seen.remove(&player_id);
+                game.players.remove(&player_id);
+            }
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::Builder::new()
@@ -172,6 +208,8 @@ async fn main() -> Result<()> {
         .init();
 
     let games: SharedGames = Arc::new(Mutex::new(HashMap::new()));
+
+    tokio::spawn(clean_idle_players(games.clone()));
 
     let app = Router::new()
         .route("/games", get(list_games))
