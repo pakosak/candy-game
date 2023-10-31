@@ -239,6 +239,11 @@ impl World {
                         self.candies_left
                     ));
                 } else {
+                    self.log(format!(
+                        "Player {} won the game",
+                        self.player_names[&player_id]
+                    ));
+                    self.map.clear_object(&player.point);
                     player.point = new_pos;
                     self.finished = true;
                 }
