@@ -66,7 +66,8 @@ pub struct GetStateRequest {
 #[derive(Serialize, Deserialize)]
 pub struct GetStateResponse {
     pub map: String,
-    pub finished: bool,
-    pub is_dead: bool,
+    pub is_finished: bool,
+    pub player_winner: bool,
+    pub player_dead: bool,
     pub logs: Vec<String>,
 }

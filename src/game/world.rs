@@ -49,7 +49,7 @@ impl Point {
 #[derive(serde::Serialize)]
 pub struct WorldState<'a> {
     pub map: String,
-    pub finished: bool,
+    pub winner: Option<u64>,
     pub dead_players: Vec<u64>,
     pub logs: &'a Vec<String>,
 }
@@ -62,7 +62,7 @@ pub struct World {
     mobs: HashMap<u64, Point>,
     shots: HashMap<u64, OrientedPoint>,
 
-    finished: bool,
+    winner: Option<u64>,
     dead_players: Vec<u64>,
     player_names: HashMap<u64, String>,
     candies_left: usize,
@@ -97,13 +97,13 @@ impl World {
     }
 
     pub fn can_play(&self, player_id: u64) -> bool {
-        !self.finished && !self.dead_players.contains(&player_id)
+        self.winner.is_none() && !self.dead_players.contains(&player_id)
     }
 
     pub fn get_state(&self) -> WorldState {
         WorldState {
             map: self.map.format(),
-            finished: self.finished,
+            winner: self.winner,
             dead_players: self.dead_players.clone(),
             logs: &self.logs,
         }
@@ -245,7 +245,7 @@ impl World {
                     ));
                     self.map.clear_object(&player.point);
                     player.point = new_pos;
-                    self.finished = true;
+                    self.winner = Some(player_id);
                 }
             }
             ObjectType::Mob => {

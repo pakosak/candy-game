@@ -132,6 +132,27 @@ async fn show_map_loop(
                 log
             )?;
         }
+
+        let splash_msg: Option<&str> = if state.player_dead {
+            Some("YOU DIED!")
+        } else if state.player_winner {
+            Some("YOU WON!")
+        } else if state.is_finished {
+            Some("GAME OVER!")
+        } else {
+            None
+        };
+
+        if let Some(msg) = splash_msg {
+            write!(
+                stdout,
+                "{}{}{}",
+                termion::cursor::Goto((width as u16) / 2 - 3, (height / 2) as u16),
+                msg,
+                termion::cursor::Goto(width as u16, height as u16)
+            )?;
+        }
+
         write!(
             stdout,
             "{}",

@@ -36,7 +36,7 @@ async fn list_games(State(games): State<SharedGames>) -> Json<GetGamesResponse> 
             id: *id,
             name: game.name.clone(),
             players: game.players.values().cloned().collect::<Vec<String>>(),
-            finished: game.world.lock().await.get_state().finished,
+            finished: game.world.lock().await.get_state().winner.is_some(),
         });
     }
     Json(resp)
@@ -116,8 +116,9 @@ async fn game_state(
         let state = world.get_state();
         let resp = GetStateResponse {
             map: state.map,
-            finished: state.finished,
-            is_dead: state.dead_players.contains(&req.player_id),
+            is_finished: state.winner.is_some(),
+            player_winner: state.winner.is_some_and(|winner| winner == req.player_id),
+            player_dead: state.dead_players.contains(&req.player_id),
             logs: state.logs.clone(),
         };
         (StatusCode::OK, Json(resp)).into_response()
@@ -137,7 +138,7 @@ async fn do_action(
     if let Some(game) = games.lock().await.get_mut(&req.game_id) {
         let mut world = game.world.lock().await;
         let state = world.get_state();
-        if state.finished {
+        if state.winner.is_some() {
             return (
                 StatusCode::BAD_REQUEST,
                 format!("Game {} already finished", req.game_id),
