@@ -51,8 +51,14 @@ async fn send_player_actions(
     player_id: u64,
 ) -> Result<()> {
     let client = reqwest::Client::new();
+    let mut should_send = true;
     loop {
         let action = rx.recv().await.ok_or(anyhow!("No msg received"))?;
+
+        // if server responded with error, it means the player is dead
+        if !should_send {
+            continue;
+        }
 
         let url = format!("http://{}/action", server);
         let req = ActionRequest {
@@ -60,13 +66,14 @@ async fn send_player_actions(
             player_id,
             action,
         };
-        client
+        should_send = client
             .post(&url)
             .json(&req)
             .send()
             .await
             .expect("Couldn't connect to server to send action")
-            .error_for_status()?;
+            .error_for_status()
+            .is_ok();
     }
 }
 
