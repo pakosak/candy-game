@@ -127,23 +127,38 @@ impl World {
         if mob_cnt == 0 {
             return;
         }
-        if let Some((_, mob_pos)) = self.mobs.iter_mut().nth(rand::random::<usize>() % mob_cnt) {
-            let new_pos = mob_pos.step(rand::random());
-            let collided_obj = self.map.get_object(&new_pos);
-            match collided_obj.type_ {
-                ObjectType::Empty => {
-                    self.map.swap_objects(mob_pos, &new_pos);
-                    mob_pos.update(new_pos);
-                }
-                ObjectType::Player(_) => {
-                    self.players.remove(&collided_obj.id);
-                    self.dead_players.push(collided_obj.id);
-                    self.map.swap_objects(mob_pos, &new_pos);
-                    self.map.clear_object(mob_pos);
-                    mob_pos.update(new_pos);
-                }
-                _ => (),
+        let random_mob_id = *self
+            .mobs
+            .keys()
+            .nth(rand::random::<usize>() % mob_cnt)
+            .unwrap();
+        let mob_pos = self.mobs.remove(&random_mob_id).unwrap();
+
+        let new_pos = mob_pos.step(rand::random());
+        let collided_obj = self.map.get_object(&new_pos);
+        let mut kill_msg: Option<String> = None;
+        match collided_obj.type_ {
+            ObjectType::Empty => {
+                self.map.swap_objects(&mob_pos, &new_pos);
+                self.mobs.insert(random_mob_id, new_pos);
             }
+            ObjectType::Player(_) => {
+                kill_msg = Some(format!(
+                    "{} killed by mob",
+                    self.player_names[&collided_obj.id]
+                ));
+                self.players.remove(&collided_obj.id);
+                self.dead_players.push(collided_obj.id);
+                self.map.swap_objects(&mob_pos, &new_pos);
+                self.map.clear_object(&mob_pos);
+                self.mobs.insert(random_mob_id, new_pos);
+            }
+            _ => {
+                self.mobs.insert(random_mob_id, mob_pos);
+            }
+        }
+        if let Some(msg) = kill_msg {
+            self.log(msg);
         }
     }
 
@@ -229,6 +244,7 @@ impl World {
                 }
             }
             ObjectType::Mob => {
+                self.log(format!("{} killed by mob", self.player_names[&player_id]));
                 self.players.remove(&player_id);
                 self.dead_players.push(player_id);
                 self.map.clear_object(&player.point);
