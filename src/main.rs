@@ -55,13 +55,14 @@ async fn show_map_loop(
             let world = world.lock().await;
 
             let world_state = world.get_state();
+            let map = world.get_map_template().place_objects(world_state.objects);
 
             write!(
                 stdout,
                 "{}{}{}",
                 termion::clear::All,
                 termion::cursor::Goto(1, 1),
-                world_state.map
+                map.format()
             )?;
 
             for (i, log) in world_state

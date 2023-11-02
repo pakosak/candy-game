@@ -12,7 +12,7 @@ use crate::game::api::{
     ActionRequest, GetStateRequest, GetStateResponse, JoinGameRequest, JoinGameResponse,
     PlayerAction,
 };
-use crate::game::map::Direction;
+use crate::game::map::{Direction, Map};
 
 fn read_keystrokes(tx: Sender<PlayerAction>) -> Result<()> {
     let mut keys = stdin().keys();
@@ -92,13 +92,7 @@ async fn handle_player_input(server: &str, game_id: u64, player_id: u64) -> Resu
     Ok(())
 }
 
-async fn show_map_loop(
-    server: &str,
-    game_id: u64,
-    player_id: u64,
-    width: usize,
-    height: usize,
-) -> Result<()> {
+async fn show_map_loop(server: &str, game_id: u64, player_id: u64, map: Map) -> Result<()> {
     let mut stdout = stdout().into_raw_mode()?;
 
     let client = reqwest::Client::new();
@@ -116,19 +110,21 @@ async fn show_map_loop(
             .json()
             .await?;
 
+        let map = map.clone().place_objects(state.objects);
+
         write!(
             stdout,
             "{}{}{}",
             termion::clear::All,
             termion::cursor::Goto(1, 1),
-            state.map
+            map.format()
         )?;
 
-        for (i, log) in state.logs.iter().rev().take(height).enumerate() {
+        for (i, log) in state.logs.iter().rev().take(map.height()).enumerate() {
             write!(
                 stdout,
                 "{}{}\r\n",
-                termion::cursor::Goto(width as u16 + 2, 1 + i as u16),
+                termion::cursor::Goto(map.width() as u16 + 2, 1 + i as u16),
                 log
             )?;
         }
@@ -147,16 +143,16 @@ async fn show_map_loop(
             write!(
                 stdout,
                 "{}{}{}",
-                termion::cursor::Goto((width as u16) / 2 - 3, (height / 2) as u16),
+                termion::cursor::Goto((map.width() as u16) / 2 - 3, (map.height() / 2) as u16),
                 msg,
-                termion::cursor::Goto(width as u16, height as u16)
+                termion::cursor::Goto(map.width() as u16, map.height() as u16)
             )?;
         }
 
         write!(
             stdout,
             "{}",
-            termion::cursor::Goto(width as u16, height as u16),
+            termion::cursor::Goto(map.width() as u16, map.height() as u16),
         )?;
 
         stdout.flush()?;
@@ -194,7 +190,7 @@ pub async fn join_game(server: &str) -> Result<()> {
     println!("Joined with player id: {}", resp.player_id);
 
     tokio::select! {
-        _ = show_map_loop(server, game_id, resp.player_id, resp.width, resp.height) => {},
+        _ = show_map_loop(server, game_id, resp.player_id, Map::parse(resp.map)) => {},
         _ = handle_player_input(server, game_id, resp.player_id) => {},
     };
 

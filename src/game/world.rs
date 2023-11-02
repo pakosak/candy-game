@@ -1,7 +1,7 @@
 use chrono::Local;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use crate::game::map::{Direction, Map, ObjectType, OrientedPoint, Point};
+use crate::game::map::{Direction, Map, ObjectType, Point};
 
 use rand::{
     distributions::{Distribution, Standard},
@@ -19,36 +19,9 @@ impl Distribution<Direction> for Standard {
     }
 }
 
-impl Point {
-    fn step(&self, dir: Direction) -> Self {
-        match dir {
-            Direction::Up => Point {
-                x: self.x,
-                y: self.y - 1,
-            },
-            Direction::Down => Point {
-                x: self.x,
-                y: self.y + 1,
-            },
-            Direction::Left => Point {
-                x: self.x - 1,
-                y: self.y,
-            },
-            Direction::Right => Point {
-                x: self.x + 1,
-                y: self.y,
-            },
-        }
-    }
-    fn update(&mut self, new_pos: Point) {
-        self.x = new_pos.x;
-        self.y = new_pos.y;
-    }
-}
-
 #[derive(serde::Serialize)]
 pub struct WorldState<'a> {
-    pub map: String,
+    pub objects: Vec<(ObjectType, Point)>,
     pub winner: Option<u64>,
     pub dead_players: Vec<u64>,
     pub logs: &'a Vec<String>,
@@ -56,65 +29,93 @@ pub struct WorldState<'a> {
 
 #[derive(Default)]
 pub struct World {
-    map: Map,
-    players: HashMap<u64, OrientedPoint>,
-    exit: Point,
+    map_template: Map,
+    players: HashMap<u64, Point>,
     mobs: HashMap<u64, Point>,
-    shots: HashMap<u64, OrientedPoint>,
+    candies: HashMap<u64, Point>,
+    shots: HashMap<u64, Point>,
 
     winner: Option<u64>,
     dead_players: Vec<u64>,
     player_names: HashMap<u64, String>,
-    candies_left: usize,
     logs: Vec<String>,
 }
 
 impl World {
     pub fn new(width: usize, height: usize, mob_cnt: usize, candy_cnt: usize) -> Self {
-        let map_ = Map::new(width, height);
-        let mut w = World {
-            map: map_,
-            candies_left: candy_cnt,
-            ..Default::default()
-        };
-        w.exit = w.map.random_empty_point();
-        w.map.place_object(ObjectType::Exit, &w.exit);
-        w.log(format!("Exit placed at {:?}", w.exit));
+        let mut map = Map::new(width, height);
 
-        for _ in 0..mob_cnt {
-            let mob = w.map.random_empty_point();
-            let mob_id = rand::random();
-            w.map.place_object_with_id(mob_id, ObjectType::Mob, &mob);
-            w.mobs.insert(mob_id, mob);
+        let exit_pos = map.random_empty_point();
+        map = map.place_object(ObjectType::Exit, &exit_pos);
+
+        let mut used_points: HashSet<Point> = HashSet::new();
+
+        let candies = (0..candy_cnt)
+            .map(|_| loop {
+                let candy_pos = map.random_empty_point();
+                if used_points.insert(candy_pos) {
+                    break (rand::random(), candy_pos);
+                }
+            })
+            .collect();
+
+        let mobs = (0..mob_cnt)
+            .map(|_| loop {
+                let mob_pos = map.random_empty_point();
+                if used_points.insert(mob_pos) {
+                    break (rand::random(), mob_pos);
+                }
+            })
+            .collect();
+
+        World {
+            map_template: map,
+            mobs,
+            candies,
+            ..Default::default()
         }
-        w.log(format!("{} mobs placed", mob_cnt));
-        for _ in 0..candy_cnt {
-            let candy = w.map.random_empty_point();
-            w.map.place_object(ObjectType::Candy, &candy);
-        }
-        w.log(format!("{} candies placed", candy_cnt));
-        w
     }
 
     pub fn can_play(&self, player_id: u64) -> bool {
         self.winner.is_none() && !self.dead_players.contains(&player_id)
     }
 
+    pub fn get_map_template(&self) -> Map {
+        self.map_template.clone()
+    }
+
     pub fn get_state(&self) -> WorldState {
         WorldState {
-            map: self.map.format(),
+            objects: self.object_positions(),
             winner: self.winner,
             dead_players: self.dead_players.clone(),
             logs: &self.logs,
         }
     }
 
+    fn object_positions(&self) -> Vec<(ObjectType, Point)> {
+        let mut positions: Vec<(ObjectType, Point)> = Vec::new();
+        for player in self.players.values() {
+            positions.push((ObjectType::Player(player.dir), *player));
+        }
+        for mob in self.mobs.values() {
+            positions.push((ObjectType::Mob, *mob));
+        }
+        for candy in self.candies.values() {
+            positions.push((ObjectType::Candy, *candy));
+        }
+        for shot in self.shots.values() {
+            positions.push((ObjectType::Shot(shot.dir), *shot));
+        }
+        positions
+    }
+
     pub fn width(&self) -> usize {
-        self.map.width()
+        self.map_template.width()
     }
 
     pub fn height(&self) -> usize {
-        self.map.height()
+        self.map_template.height()
     }
 
     fn log(&mut self, msg: String) {
@@ -122,10 +123,33 @@ impl World {
             .push(format!("{}: {}", Local::now().format("%H:%M:%S"), msg));
     }
 
-    pub fn move_random_mob(&mut self) {
+    fn fill_map(&self, mut map: Map) -> Map {
+        for (id, player) in &self.players {
+            map = map.place_object_with_id(*id, ObjectType::Player(player.dir), player);
+        }
+        for (id, mob) in &self.mobs {
+            map = map.place_object_with_id(*id, ObjectType::Mob, mob);
+        }
+        for (id, candy) in &self.candies {
+            map = map.place_object_with_id(*id, ObjectType::Candy, candy);
+        }
+        for (id, shot) in &self.shots {
+            map = map.place_object_with_id(*id, ObjectType::Shot(shot.dir), shot);
+        }
+        map
+    }
+
+    pub fn move_world(&mut self) {
+        let mut map = self.fill_map(self.get_map_template());
+
+        map = self.move_random_mob(map);
+        self.move_shots(map);
+    }
+
+    pub fn move_random_mob(&mut self, mut map: Map) -> Map {
         let mob_cnt = self.mobs.len();
         if mob_cnt == 0 {
-            return;
+            return map;
         }
         let random_mob_id = *self
             .mobs
@@ -134,50 +158,47 @@ impl World {
             .unwrap();
         let mob_pos = self.mobs.remove(&random_mob_id).unwrap();
 
-        let new_pos = mob_pos.step(rand::random());
-        let collided_obj = self.map.get_object(&new_pos);
-        let mut kill_msg: Option<String> = None;
+        let new_pos = mob_pos.turn_and_step(rand::random());
+        let collided_obj = map.get_object(&new_pos);
         match collided_obj.type_ {
             ObjectType::Empty => {
-                self.map.swap_objects(&mob_pos, &new_pos);
+                map.swap_objects(&mob_pos, &new_pos);
                 self.mobs.insert(random_mob_id, new_pos);
             }
             ObjectType::Player(_) => {
-                kill_msg = Some(format!(
+                self.log(format!(
                     "{} killed by mob",
                     self.player_names[&collided_obj.id]
                 ));
                 self.players.remove(&collided_obj.id);
                 self.dead_players.push(collided_obj.id);
-                self.map.swap_objects(&mob_pos, &new_pos);
-                self.map.clear_object(&mob_pos);
+                map.swap_objects(&mob_pos, &new_pos);
+                map.clear_object(&mob_pos);
                 self.mobs.insert(random_mob_id, new_pos);
             }
             _ => {
                 self.mobs.insert(random_mob_id, mob_pos);
             }
         }
-        if let Some(msg) = kill_msg {
-            self.log(msg);
-        }
+        map
     }
 
-    pub fn move_shots(&mut self) {
+    pub fn move_shots(&mut self, mut map: Map) -> Map {
         let mut new_logs: Vec<String> = Vec::new();
         self.shots.retain(|_, shot| {
-            let new_pos = shot.point.step(shot.dir);
-            let collider_obj = self.map.get_object(&new_pos);
+            let new_pos = shot.step();
+            let collider_obj = map.get_object(&new_pos);
             match collider_obj.type_ {
                 ObjectType::Empty => {
-                    self.map.swap_objects(&shot.point, &new_pos);
-                    shot.point.update(new_pos);
+                    map.swap_objects(shot, &new_pos);
+                    shot.update(new_pos);
                     true
                 }
                 ObjectType::Mob => {
                     new_logs.push("Mob killed by stray shot".to_string());
                     self.mobs.remove(&collider_obj.id);
-                    self.map.clear_object(&shot.point);
-                    self.map.clear_object(&new_pos);
+                    map.clear_object(shot);
+                    map.clear_object(&new_pos);
                     false
                 }
                 ObjectType::Player(_) => {
@@ -187,12 +208,12 @@ impl World {
                     ));
                     self.players.remove(&collider_obj.id);
                     self.dead_players.push(collider_obj.id);
-                    self.map.clear_object(&shot.point);
-                    self.map.clear_object(&new_pos);
+                    map.clear_object(shot);
+                    map.clear_object(&new_pos);
                     false
                 }
                 _ => {
-                    self.map.clear_object(&shot.point);
+                    map.clear_object(shot);
                     false
                 }
             }
@@ -200,19 +221,14 @@ impl World {
         for log in new_logs {
             self.log(log);
         }
+        map
     }
 
     pub fn spawn_player(&mut self, player_name: &str) -> u64 {
-        let player = OrientedPoint {
-            point: self.map.random_empty_point(),
-            dir: Direction::Right,
-        };
+        let map = self.fill_map(self.get_map_template());
+
+        let player = map.random_empty_point();
         let player_id = rand::random();
-        self.map.place_object_with_id(
-            player_id,
-            ObjectType::Player(Direction::Right),
-            &player.point,
-        );
         self.players.insert(player_id, player);
         self.player_names.insert(player_id, player_name.to_string());
         self.log(format!("Player {} entered world", player_name));
@@ -220,31 +236,32 @@ impl World {
     }
 
     pub fn move_player(&mut self, player_id: u64, direction: Direction) {
+        let map = self.fill_map(self.get_map_template());
+
         let mut player = self
             .players
             .remove(&player_id)
             .unwrap_or_else(|| panic!("Player {} not found", player_id));
         player.dir = direction;
-        let new_pos = player.point.step(direction);
-        let collider_obj = self.map.get_object(&new_pos);
+        let new_pos = player.step();
+        let collider_obj = map.get_object(&new_pos);
         match collider_obj.type_ {
             ObjectType::Empty => {
-                self.map.clear_object(&player.point);
-                player.point = new_pos;
+                player = new_pos;
             }
             ObjectType::Exit => {
-                if self.candies_left != 0 {
+                if self.candies.is_empty() {
                     self.log(format!(
                         "You need to collect {} more candies, {}",
-                        self.candies_left, self.player_names[&player_id]
+                        self.candies.len(),
+                        self.player_names[&player_id]
                     ));
                 } else {
                     self.log(format!(
                         "Player {} won the game",
                         self.player_names[&player_id]
                     ));
-                    self.map.clear_object(&player.point);
-                    player.point = new_pos;
+                    player = new_pos; // remove player
                     self.winner = Some(player_id);
                 }
             }
@@ -252,46 +269,35 @@ impl World {
                 self.log(format!("{} killed by mob", self.player_names[&player_id]));
                 self.players.remove(&player_id);
                 self.dead_players.push(player_id);
-                self.map.clear_object(&player.point);
                 return;
             }
             ObjectType::Candy => {
-                self.map.clear_object(&player.point);
-                player.point = new_pos;
-                self.candies_left -= 1;
-                self.log(format!("{} candies left", self.candies_left));
+                player = new_pos;
+                self.candies.remove(&collider_obj.id);
+                self.log(format!("{} candies left", self.candies.len()));
             }
             _ => {}
         }
-        self.map
-            .place_object_with_id(player_id, ObjectType::Player(direction), &player.point);
         self.players.insert(player_id, player);
     }
 
     pub fn player_shoot(&mut self, player_id: u64) {
+        let map = self.fill_map(self.get_map_template());
+
         let player = self
             .players
             .get(&player_id)
             .unwrap_or_else(|| panic!("Player {} not found", player_id));
-        let pos = player.point.step(player.dir);
+        let pos = player.step();
 
-        let collider_obj = *self.map.get_object(&pos);
+        let collider_obj = map.get_object(&pos);
         match collider_obj.type_ {
             ObjectType::Empty => {
                 let shot_id = rand::random();
-                self.map
-                    .place_object_with_id(shot_id, ObjectType::Shot(player.dir), &pos);
-                self.shots.insert(
-                    shot_id,
-                    OrientedPoint {
-                        point: pos,
-                        dir: player.dir,
-                    },
-                );
+                self.shots.insert(shot_id, pos);
             }
             ObjectType::Mob => {
                 self.mobs.remove(&collider_obj.id);
-                self.map.clear_object(&pos);
             }
             ObjectType::Player(_) => {
                 self.log(format!(
@@ -300,7 +306,6 @@ impl World {
                 ));
                 self.players.remove(&collider_obj.id);
                 self.dead_players.push(collider_obj.id);
-                self.map.clear_object(&pos);
             }
             _ => (),
         }
@@ -311,9 +316,7 @@ impl World {
             "Player {} left the game",
             self.player_names[&player_id]
         ));
-        if let Some(player) = self.players.remove(&player_id) {
-            self.map.clear_object(&player.point);
-        }
+        self.players.remove(&player_id);
         self.player_names.remove(&player_id);
         self.dead_players.retain(|player| *player != player_id);
     }

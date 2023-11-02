@@ -8,7 +8,7 @@ fn read_create_game_input() -> Result<CreateGameRequest> {
 
     let width: usize = Input::new()
         .with_prompt("Width")
-        .default(50)
+        .default(30)
         .interact_text()?;
 
     let height: usize = Input::new()

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::game::map::Direction;
+use crate::game::map::{Direction, ObjectType, Point};
 
 #[derive(Serialize, Debug, Deserialize)]
 pub struct GameInfo {
@@ -40,6 +40,7 @@ pub struct JoinGameResponse {
     pub player_id: u64,
     pub width: usize,
     pub height: usize,
+    pub map: String,
     // also send immovable objects and later only send moving parts
 }
 
@@ -65,7 +66,7 @@ pub struct GetStateRequest {
 
 #[derive(Serialize, Deserialize)]
 pub struct GetStateResponse {
-    pub map: String,
+    pub objects: Vec<(ObjectType, Point)>,
     pub is_finished: bool,
     pub player_winner: bool,
     pub player_dead: bool,

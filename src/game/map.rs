@@ -1,18 +1,7 @@
 use rand::prelude::*;
+use serde::{Deserialize, Serialize};
 
-#[derive(Default, Clone, Copy, Debug)]
-pub struct Point {
-    pub x: usize,
-    pub y: usize,
-}
-
-#[derive(Default, Clone, Copy, Debug)]
-pub struct OrientedPoint {
-    pub point: Point,
-    pub dir: Direction,
-}
-
-#[derive(Copy, Clone, Default, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Copy, Clone, Default, Debug, PartialEq, Serialize, Deserialize, Eq, Hash)]
 #[serde(rename_all = "lowercase", tag = "direction")]
 pub enum Direction {
     #[default]
@@ -22,7 +11,47 @@ pub enum Direction {
     Right,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Default, Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Eq, Hash)]
+pub struct Point {
+    pub x: usize,
+    pub y: usize,
+    pub dir: Direction,
+}
+
+impl Point {
+    pub fn new(x: usize, y: usize) -> Self {
+        Point {
+            x,
+            y,
+            ..Default::default()
+        }
+    }
+    pub fn with_dir(x: usize, y: usize, dir: Direction) -> Self {
+        Point { x, y, dir }
+    }
+    pub fn turn_and_step(&self, dir: Direction) -> Self {
+        match dir {
+            Direction::Up => Point::new(self.x, self.y - 1),
+            Direction::Down => Point::new(self.x, self.y + 1),
+            Direction::Left => Point::new(self.x - 1, self.y),
+            Direction::Right => Point::new(self.x + 1, self.y),
+        }
+    }
+    pub fn step(&self) -> Self {
+        match self.dir {
+            Direction::Up => Point::with_dir(self.x, self.y - 1, self.dir),
+            Direction::Down => Point::with_dir(self.x, self.y + 1, self.dir),
+            Direction::Left => Point::with_dir(self.x - 1, self.y, self.dir),
+            Direction::Right => Point::with_dir(self.x + 1, self.y, self.dir),
+        }
+    }
+    pub fn update(&mut self, new_pos: Point) {
+        self.x = new_pos.x;
+        self.y = new_pos.y;
+    }
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub enum ObjectType {
     Wall,
     Player(Direction),
@@ -45,7 +74,7 @@ impl MapObject {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Map {
     map: Vec<Vec<MapObject>>,
     width: usize,
@@ -60,6 +89,36 @@ impl Map {
             height,
         }
         .build_walls()
+    }
+
+    pub fn parse(template: String) -> Self {
+        let mut map = Vec::new();
+        let mut width = 0;
+        let mut height = 0;
+        for line in template.lines() {
+            let mut row = Vec::new();
+            for ch in line.chars() {
+                let object = match ch {
+                    '#' => MapObject::new(ObjectType::Wall),
+                    '^' => MapObject::new(ObjectType::Player(Direction::Up)),
+                    'v' => MapObject::new(ObjectType::Player(Direction::Down)),
+                    '<' => MapObject::new(ObjectType::Player(Direction::Left)),
+                    '>' => MapObject::new(ObjectType::Player(Direction::Right)),
+                    '|' => MapObject::new(ObjectType::Shot(Direction::Up)),
+                    '-' => MapObject::new(ObjectType::Shot(Direction::Left)),
+                    'X' => MapObject::new(ObjectType::Exit),
+                    '*' => MapObject::new(ObjectType::Mob),
+                    'C' => MapObject::new(ObjectType::Candy),
+                    ' ' => MapObject::new(ObjectType::Empty),
+                    _ => panic!("Unknown character in map template: {}", ch),
+                };
+                row.push(object);
+            }
+            map.push(row);
+            width = line.len();
+            height += 1;
+        }
+        Map { map, width, height }
     }
 
     pub fn width(&self) -> usize {
@@ -78,7 +137,7 @@ impl Map {
             x = rng.gen_range(1..(self.width - 1));
             y = rng.gen_range(1..(self.height - 1));
         }
-        Point { x, y }
+        Point::new(x, y)
     }
 
     pub fn format(&self) -> String {
@@ -111,12 +170,21 @@ impl Map {
         map
     }
 
-    pub fn place_object_with_id(&mut self, id: u64, type_: ObjectType, pos: &Point) {
-        self.map[pos.y][pos.x] = MapObject { id, type_ };
+    pub fn place_objects(mut self, objects: Vec<(ObjectType, Point)>) -> Self {
+        for (type_, pos) in objects {
+            self.map[pos.y][pos.x] = MapObject::new(type_);
+        }
+        self
     }
 
-    pub fn place_object(&mut self, type_: ObjectType, pos: &Point) {
+    pub fn place_object_with_id(mut self, id: u64, type_: ObjectType, pos: &Point) -> Self {
+        self.map[pos.y][pos.x] = MapObject { id, type_ };
+        self
+    }
+
+    pub fn place_object(mut self, type_: ObjectType, pos: &Point) -> Self {
         self.map[pos.y][pos.x] = MapObject { id: 0, type_ };
+        self
     }
 
     pub fn get_object(&self, pos: &Point) -> &MapObject {

@@ -93,6 +93,7 @@ async fn join_game(
                 player_id,
                 width: world.width(),
                 height: world.height(),
+                map: world.get_map_template().format(),
             }),
         )
             .into_response()
@@ -115,7 +116,7 @@ async fn game_state(
         let world = game.world.lock().await;
         let state = world.get_state();
         let resp = GetStateResponse {
-            map: state.map,
+            objects: state.objects,
             is_finished: state.winner.is_some(),
             player_winner: state.winner.is_some_and(|winner| winner == req.player_id),
             player_dead: state.dead_players.contains(&req.player_id),
