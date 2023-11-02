@@ -58,6 +58,42 @@ pub enum ObjectType {
     Empty,
 }
 
+impl ObjectType {
+    fn from_char(c: char) -> Self {
+        match c {
+            '█' => ObjectType::Wall,
+            '^' => ObjectType::Player(Direction::Up),
+            'v' => ObjectType::Player(Direction::Down),
+            '<' => ObjectType::Player(Direction::Left),
+            '>' => ObjectType::Player(Direction::Right),
+            '|' => ObjectType::Shot(Direction::Up),
+            '-' => ObjectType::Shot(Direction::Left),
+            'X' => ObjectType::Exit,
+            '*' => ObjectType::Mob,
+            '⏾' => ObjectType::Candy,
+            ' ' => ObjectType::Empty,
+            _ => panic!("Unknown character in map template: {}", c),
+        }
+    }
+    fn to_char(&self) -> char {
+        match self {
+            ObjectType::Wall => '█',
+            ObjectType::Player(Direction::Up) => '^',
+            ObjectType::Player(Direction::Down) => 'v',
+            ObjectType::Player(Direction::Left) => '<',
+            ObjectType::Player(Direction::Right) => '>',
+            ObjectType::Shot(Direction::Up) => '|',
+            ObjectType::Shot(Direction::Down) => '|',
+            ObjectType::Shot(Direction::Left) => '-',
+            ObjectType::Shot(Direction::Right) => '-',
+            ObjectType::Exit => 'X',
+            ObjectType::Mob => '*',
+            ObjectType::Candy => '⏾',
+            ObjectType::Empty => ' ',
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct MapObject {
     pub id: u64,
@@ -92,26 +128,12 @@ impl Map {
         let mut width = 0;
         let mut height = 0;
         for line in template.lines() {
-            let mut row = Vec::new();
-            for ch in line.chars() {
-                let object = match ch {
-                    '#' => MapObject::new(ObjectType::Wall),
-                    '^' => MapObject::new(ObjectType::Player(Direction::Up)),
-                    'v' => MapObject::new(ObjectType::Player(Direction::Down)),
-                    '<' => MapObject::new(ObjectType::Player(Direction::Left)),
-                    '>' => MapObject::new(ObjectType::Player(Direction::Right)),
-                    '|' => MapObject::new(ObjectType::Shot(Direction::Up)),
-                    '-' => MapObject::new(ObjectType::Shot(Direction::Left)),
-                    'X' => MapObject::new(ObjectType::Exit),
-                    '*' => MapObject::new(ObjectType::Mob),
-                    'C' => MapObject::new(ObjectType::Candy),
-                    ' ' => MapObject::new(ObjectType::Empty),
-                    _ => panic!("Unknown character in map template: {}", ch),
-                };
-                row.push(object);
-            }
+            let row: Vec<MapObject> = line
+                .chars()
+                .map(|ch| MapObject::new(ObjectType::from_char(ch)))
+                .collect();
+            width = row.len();
             map.push(row);
-            width = line.len();
             height += 1;
         }
         Map { map, width, height }
@@ -140,25 +162,7 @@ impl Map {
         let mut map = String::new();
         for row in &self.map {
             for object in row {
-                match object.type_ {
-                    ObjectType::Wall => map.push('#'),
-                    ObjectType::Player(dir) => match dir {
-                        Direction::Up => map.push('^'),
-                        Direction::Down => map.push('v'),
-                        Direction::Left => map.push('<'),
-                        Direction::Right => map.push('>'),
-                    },
-                    ObjectType::Shot(dir) => match dir {
-                        Direction::Up => map.push('|'),
-                        Direction::Down => map.push('|'),
-                        Direction::Left => map.push('-'),
-                        Direction::Right => map.push('-'),
-                    },
-                    ObjectType::Exit => map.push('X'),
-                    ObjectType::Mob => map.push('*'),
-                    ObjectType::Candy => map.push('C'),
-                    ObjectType::Empty => map.push(' '),
-                }
+                map.push(object.type_.to_char());
             }
             map.push('\r');
             map.push('\n');
