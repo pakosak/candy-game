@@ -1,20 +1,23 @@
 use anyhow::Result;
-use dialoguer::Input;
+use dialoguer::{Input, Select};
 
 use crate::game::api::{CreateGameRequest, CreateGameResponse};
+use crate::game::mazes::MAZES;
 
 fn read_create_game_input() -> Result<CreateGameRequest> {
     let name: String = Input::new().with_prompt("Game name").interact_text()?;
 
-    let width: usize = Input::new()
-        .with_prompt("Width")
-        .default(30)
-        .interact_text()?;
-
-    let height: usize = Input::new()
-        .with_prompt("Height")
-        .default(20)
-        .interact_text()?;
+    let available_mazes = MAZES.keys().copied().collect::<Vec<&str>>();
+    let maze_name: String = available_mazes
+        .get(
+            Select::new()
+                .with_prompt("Maze name")
+                .items(&available_mazes)
+                .default(0)
+                .interact()?,
+        )
+        .unwrap()
+        .to_string();
 
     let mob_cnt: usize = Input::new()
         .with_prompt("Mob count")
@@ -28,8 +31,7 @@ fn read_create_game_input() -> Result<CreateGameRequest> {
 
     Ok(CreateGameRequest {
         name,
-        width,
-        height,
+        maze_name,
         mob_cnt,
         candy_cnt,
     })

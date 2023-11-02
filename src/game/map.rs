@@ -1,6 +1,8 @@
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use crate::game::mazes::MAZES;
+
 #[derive(Copy, Clone, Default, Debug, PartialEq, Serialize, Deserialize, Eq, Hash)]
 #[serde(rename_all = "lowercase", tag = "direction")]
 pub enum Direction {
@@ -114,16 +116,9 @@ pub struct Map {
 }
 
 impl Map {
-    pub fn new(width: usize, height: usize) -> Self {
-        Map {
-            map: vec![vec![MapObject::new(ObjectType::Empty); width]; height],
-            width,
-            height,
-        }
-        .build_walls()
-    }
+    pub fn new(maze_name: &str) -> Self {
+        let template = MAZES.get(maze_name).unwrap();
 
-    pub fn parse(template: String) -> Self {
         let mut map = Vec::new();
         let mut width = 0;
         let mut height = 0;
@@ -199,18 +194,5 @@ impl Map {
         let tmp = self.map[pos1.y][pos1.x];
         self.map[pos1.y][pos1.x] = self.map[pos2.y][pos2.x];
         self.map[pos2.y][pos2.x] = tmp;
-    }
-
-    fn build_walls(mut self) -> Self {
-        for row in &mut self.map {
-            row[0] = MapObject::new(ObjectType::Wall);
-            row[self.width - 1] = MapObject::new(ObjectType::Wall);
-        }
-        for i in 0..self.width {
-            self.map[0][i] = MapObject::new(ObjectType::Wall);
-            self.map[self.height - 1][i] = MapObject::new(ObjectType::Wall);
-        }
-
-        self
     }
 }

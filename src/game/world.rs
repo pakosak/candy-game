@@ -42,8 +42,8 @@ pub struct World {
 }
 
 impl World {
-    pub fn new(width: usize, height: usize, mob_cnt: usize, candy_cnt: usize) -> Self {
-        let mut map = Map::new(width, height);
+    pub fn new(maze_name: &str, mob_cnt: usize, candy_cnt: usize) -> Self {
+        let mut map = Map::new(maze_name);
 
         let exit_pos = map.random_empty_point();
         map = map.place_object(ObjectType::Exit, &exit_pos);
@@ -78,10 +78,6 @@ impl World {
 
     pub fn can_play(&self, player_id: u64) -> bool {
         self.winner.is_none() && !self.dead_players.contains(&player_id)
-    }
-
-    pub fn get_map_template(&self) -> Map {
-        self.map_template.clone()
     }
 
     pub fn get_state(&self) -> WorldState {
@@ -140,7 +136,7 @@ impl World {
     }
 
     pub fn move_world(&mut self) {
-        let mut map = self.fill_map(self.get_map_template());
+        let mut map = self.fill_map(self.map_template.clone());
 
         map = self.move_random_mob(map);
         self.move_shots(map);
@@ -225,7 +221,7 @@ impl World {
     }
 
     pub fn spawn_player(&mut self, player_name: &str) -> u64 {
-        let map = self.fill_map(self.get_map_template());
+        let map = self.fill_map(self.map_template.clone());
 
         let player = map.random_empty_point();
         let player_id = rand::random();
@@ -236,7 +232,7 @@ impl World {
     }
 
     pub fn move_player(&mut self, player_id: u64, direction: Direction) {
-        let map = self.fill_map(self.get_map_template());
+        let map = self.fill_map(self.map_template.clone());
 
         let mut player = self
             .players
@@ -282,7 +278,7 @@ impl World {
     }
 
     pub fn player_shoot(&mut self, player_id: u64) {
-        let map = self.fill_map(self.get_map_template());
+        let map = self.fill_map(self.map_template.clone());
 
         let player = self
             .players

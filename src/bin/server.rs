@@ -22,6 +22,7 @@ const CLIENT_MAX_PING_S: u64 = 5;
 
 struct Game {
     name: String,
+    maze_name: String,
     players: HashMap<u64, String>,
     players_last_seen: HashMap<u64, Instant>,
     world: Arc<Mutex<World>>,
@@ -35,6 +36,7 @@ async fn list_games(State(games): State<SharedGames>) -> Json<GetGamesResponse> 
         resp.games.push(GameInfo {
             id: *id,
             name: game.name.clone(),
+            maze_name: game.maze_name.clone(),
             players: game.players.values().cloned().collect::<Vec<String>>(),
             finished: game.world.lock().await.get_state().winner.is_some(),
         });
@@ -52,11 +54,11 @@ async fn create_game(
         game_id,
         Game {
             name: req.name.clone(),
+            maze_name: req.maze_name.clone(),
             players: HashMap::new(),
             players_last_seen: HashMap::new(),
             world: Arc::new(Mutex::new(World::new(
-                req.width,
-                req.height,
+                req.maze_name.as_str(),
                 req.mob_cnt,
                 req.candy_cnt,
             ))),
@@ -91,7 +93,7 @@ async fn join_game(
             StatusCode::OK,
             Json(JoinGameResponse {
                 player_id,
-                map: world.get_map_template().format(),
+                maze_name: game.maze_name.clone(),
             }),
         )
             .into_response()

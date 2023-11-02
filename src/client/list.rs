@@ -11,6 +11,7 @@ pub async fn list_games(server: &str) -> Result<()> {
     table.add_row(Row::new(vec![
         Cell::new("ID"),
         Cell::new("Name"),
+        Cell::new("Maze name"),
         Cell::new("Players"),
         Cell::new("Finished"),
     ]));
@@ -18,6 +19,7 @@ pub async fn list_games(server: &str) -> Result<()> {
         table.add_row(row!(
             &game.id.to_string(),
             &game.name,
+            &game.maze_name,
             &game.players.join(", "),
             if game.finished { "Yes" } else { "No" }
         ));

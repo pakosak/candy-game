@@ -13,6 +13,7 @@ use crate::game::api::{
     PlayerAction,
 };
 use crate::game::map::{Direction, Map};
+use crate::game::mazes::MAZES;
 
 fn read_keystrokes(tx: Sender<PlayerAction>) -> Result<()> {
     let mut keys = stdin().keys();
@@ -186,11 +187,17 @@ pub async fn join_game(server: &str) -> Result<()> {
         println!("Error joining game: {}", resp.text().await?);
         return Ok(());
     }
+
     let resp: JoinGameResponse = resp.json().await?;
+    if !MAZES.contains_key(&resp.maze_name) {
+        println!("Could not find maze template: {}", resp.maze_name);
+        return Ok(());
+    }
+
     println!("Joined with player id: {}", resp.player_id);
 
     tokio::select! {
-        _ = show_map_loop(server, game_id, resp.player_id, Map::parse(resp.map)) => {},
+        _ = show_map_loop(server, game_id, resp.player_id, Map::new(&resp.maze_name)) => {},
         _ = handle_player_input(server, game_id, resp.player_id) => {},
     };
 

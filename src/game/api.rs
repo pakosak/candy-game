@@ -6,6 +6,7 @@ use crate::game::map::{Direction, ObjectType, Point};
 pub struct GameInfo {
     pub id: u64,
     pub name: String,
+    pub maze_name: String,
     pub players: Vec<String>,
     pub finished: bool,
 }
@@ -18,8 +19,7 @@ pub struct GetGamesResponse {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreateGameRequest {
     pub name: String,
-    pub width: usize,
-    pub height: usize,
+    pub maze_name: String,
     pub mob_cnt: usize,
     pub candy_cnt: usize,
 }
@@ -38,7 +38,7 @@ pub struct JoinGameRequest {
 #[derive(Serialize, Deserialize)]
 pub struct JoinGameResponse {
     pub player_id: u64,
-    pub map: String,
+    pub maze_name: String,
 }
 
 #[derive(Serialize, Deserialize)]
