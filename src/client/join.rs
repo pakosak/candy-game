@@ -157,7 +157,7 @@ async fn show_map_loop(server: &str, game_id: u64, player_id: u64, map: Map) -> 
 
         stdout.flush()?;
 
-        sleep(Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(50)).await;
     }
 }
 
