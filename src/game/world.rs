@@ -43,10 +43,7 @@ pub struct World {
 
 impl World {
     pub fn new(maze_name: &str, mob_cnt: usize, candy_cnt: usize) -> Self {
-        let mut map = Map::new(maze_name);
-
-        let exit_pos = map.random_empty_point();
-        map = map.place_object(ObjectType::Exit, &exit_pos);
+        let map = Map::new(maze_name);
 
         let mut used_points: HashSet<Point> = HashSet::new();
 
