@@ -26,9 +26,6 @@ impl Point {
             ..Default::default()
         }
     }
-    pub fn with_dir(x: usize, y: usize, dir: Direction) -> Self {
-        Point { x, y, dir }
-    }
     pub fn turn_and_step(&self, dir: Direction) -> Self {
         match dir {
             Direction::Up => Point::new(self.x, self.y - 1),
@@ -38,12 +35,11 @@ impl Point {
         }
     }
     pub fn step(&self) -> Self {
-        match self.dir {
-            Direction::Up => Point::with_dir(self.x, self.y - 1, self.dir),
-            Direction::Down => Point::with_dir(self.x, self.y + 1, self.dir),
-            Direction::Left => Point::with_dir(self.x - 1, self.y, self.dir),
-            Direction::Right => Point::with_dir(self.x + 1, self.y, self.dir),
-        }
+        self.turn_and_step(self.dir).set_dir(self.dir)
+    }
+    fn set_dir(mut self, dir: Direction) -> Self {
+        self.dir = dir;
+        self
     }
     pub fn update(&mut self, new_pos: Point) {
         self.x = new_pos.x;
