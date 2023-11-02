@@ -44,7 +44,8 @@ POST /join
 }
 <-
 {
-    "player_id": uint
+    "player_id": uint,
+    "map": string
 }
 
 POST /action
@@ -54,6 +55,8 @@ POST /action
     "player_id": uint,
     "action": Action
 }
+
+where
 
 Action =
 {
@@ -73,9 +76,10 @@ POST /state
 }
 <-
 {
-    "map": string,
-    "finished": bool,
-    "dead_players": [string, ...],
+    "objects": [[ObjectType, Point], ...],
+    "is_finished": bool,
+    "player_winner": bool,
+    "player_dead": bool,
     "logs": [string, ...]
 }
 

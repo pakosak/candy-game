@@ -91,8 +91,6 @@ async fn join_game(
             StatusCode::OK,
             Json(JoinGameResponse {
                 player_id,
-                width: world.width(),
-                height: world.height(),
                 map: world.get_map_template().format(),
             }),
         )
