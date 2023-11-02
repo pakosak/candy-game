@@ -250,7 +250,7 @@ impl World {
                 player = new_pos;
             }
             ObjectType::Exit => {
-                if self.candies.is_empty() {
+                if !self.candies.is_empty() {
                     self.log(format!(
                         "You need to collect {} more candies, {}",
                         self.candies.len(),
