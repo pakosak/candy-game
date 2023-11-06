@@ -1,5 +1,6 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use dialoguer::{Input, Select};
+use std::fmt;
 use std::io::{stdin, stdout, Write};
 use termion::event::Key;
 use termion::input::TermRead;
@@ -9,7 +10,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{sleep, Duration, Instant};
 
 use crate::game::api::{
-    ActionRequest, GetGamesResponse, GetStateRequest, GetStateResponse, JoinGameRequest,
+    ActionRequest, GameInfo, GetGamesResponse, GetStateRequest, GetStateResponse, JoinGameRequest,
     JoinGameResponse, PlayerAction,
 };
 use crate::game::map::{Direction, Map};
@@ -162,6 +163,12 @@ async fn show_map_loop(server: &str, game_id: u64, player_id: u64, map: Map) -> 
     }
 }
 
+impl fmt::Display for GameInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {} ({})", self.id, self.name, self.maze_name)
+    }
+}
+
 pub async fn join_game(server: &str) -> Result<()> {
     let url = format!("http://{}/games", server);
     let available_games = reqwest::get(&url)
@@ -169,18 +176,20 @@ pub async fn join_game(server: &str) -> Result<()> {
         .json::<GetGamesResponse>()
         .await?
         .games
-        .iter()
-        .map(|game| game.id)
-        .collect::<Vec<u64>>();
+        .to_vec();
+
+    if available_games.is_empty() {
+        println!("No games available");
+        return Ok(());
+    }
 
     let url = format!("http://{}/join", server);
 
     let game_id: u64 = Select::new()
-        .with_prompt("Game ID")
+        .with_prompt("Choose game")
         .items(&available_games)
         .default(0)
-        .interact()
-        .context("No games available")? as u64;
+        .interact()? as u64;
     let player_name: String = Input::new().with_prompt("Player name").interact_text()?;
 
     let req = JoinGameRequest {

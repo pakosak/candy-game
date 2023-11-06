@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::game::map::{Direction, ObjectType, Point};
 
-#[derive(Serialize, Debug, Deserialize)]
+#[derive(Serialize, Debug, Deserialize, Clone)]
 pub struct GameInfo {
     pub id: u64,
     pub name: String,
