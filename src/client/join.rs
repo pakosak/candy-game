@@ -154,7 +154,7 @@ async fn show_map_loop(server: &str, game_id: u64, player_id: u64, map: Map) -> 
         write!(
             stdout,
             "{}",
-            termion::cursor::Goto(map.width() as u16, map.height() as u16),
+            termion::cursor::Goto(0, (map.height() + 1) as u16),
         )?;
 
         stdout.flush()?;
