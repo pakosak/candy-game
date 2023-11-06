@@ -185,11 +185,12 @@ pub async fn join_game(server: &str) -> Result<()> {
 
     let url = format!("http://{}/join", server);
 
-    let game_id: u64 = Select::new()
+    let game_idx: usize = Select::new()
         .with_prompt("Choose game")
         .items(&available_games)
         .default(0)
-        .interact()? as u64;
+        .interact()?;
+    let game_id = available_games.get(game_idx).unwrap().id;
     let player_name: String = Input::new().with_prompt("Player name").interact_text()?;
 
     let req = JoinGameRequest {
